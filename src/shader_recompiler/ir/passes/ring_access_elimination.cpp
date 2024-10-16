@@ -112,8 +112,8 @@ void RingAccessElimination(const IR::Program& program, const RuntimeInfo& runtim
                 break;
             }
             case IR::Opcode::StoreBufferU32: {
-                const auto info = inst.Flags<IR::BufferInstInfo>();
-                if (!info.system_coherent || !info.globally_coherent) {
+                const auto buffer_info = inst.Flags<IR::BufferInstInfo>();
+                if (!buffer_info.system_coherent || !buffer_info.globally_coherent) {
                     break;
                 }
 

@@ -4,6 +4,7 @@
 #include "common/config.h"
 #include "common/debug.h"
 #include "core/memory.h"
+#include "shader_recompiler/runtime_info.h"
 #include "video_core/amdgpu/liverpool.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_rasterizer.h"
@@ -57,7 +58,7 @@ void Rasterizer::Draw(bool is_indexed, u32 index_offset) {
         UNREACHABLE();
     }
 
-    const auto& vs_info = pipeline->GetStage(Shader::Stage::Vertex);
+    const auto& vs_info = pipeline->GetStage(Shader::LogicalStage::Vertex);
     buffer_cache.BindVertexBuffers(vs_info);
     const u32 num_indices = buffer_cache.BindIndexBuffer(is_indexed, index_offset);
 
@@ -96,7 +97,7 @@ void Rasterizer::DrawIndirect(bool is_indexed, VAddr address, u32 offset, u32 si
         UNREACHABLE();
     }
 
-    const auto& vs_info = pipeline->GetStage(Shader::Stage::Vertex);
+    const auto& vs_info = pipeline->GetStage(Shader::LogicalStage::Vertex);
     buffer_cache.BindVertexBuffers(vs_info);
     const u32 num_indices = buffer_cache.BindIndexBuffer(is_indexed, 0);
 
