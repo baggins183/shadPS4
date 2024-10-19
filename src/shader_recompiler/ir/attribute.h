@@ -72,10 +72,12 @@ enum class Attribute : u64 {
     LocalInvocationId = 75,
     LocalInvocationIndex = 76,
     FragCoord = 77,
-    InstanceId0 = 78, // step rate 0
-    InstanceId1 = 79, // step rate 1
-    TessellationEvaluationPointU = 80,
-    TessellationEvaluationPointV = 81,
+    InstanceId0 = 78,  // step rate 0
+    InstanceId1 = 79,  // step rate 1
+    InvocationId = 80, // TCS id in output patch and instanced geometry shader id
+    PatchVertices = 81,
+    TessellationEvaluationPointU = 82,
+    TessellationEvaluationPointV = 83,
     Max,
 };
 

@@ -28,6 +28,7 @@ enum class LogicalStage : u32 {
     TessellationControl,
     TessellationEval,
     Geometry,
+    GsCopy,
     Compute,
 };
 

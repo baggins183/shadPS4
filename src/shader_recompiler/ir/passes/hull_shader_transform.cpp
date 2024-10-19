@@ -60,6 +60,11 @@ namespace Shader::Optimization {
  * NOTE: This pass must be run before constant propagation as it relies on relatively specific
  * pattern matching that might be mutated that that optimization pass.
  *
+ * TODO: need to be careful about reading from output arrays at idx other than InvocationID
+ * Need SPIRV OpControlBarrier
+ * "Wait for all active invocations within the specified Scope to reach the current point of
+ * execution."
+ * Must be placed in uniform control flow
  */
 
 void HullShaderTransform(const IR::Program& program) {

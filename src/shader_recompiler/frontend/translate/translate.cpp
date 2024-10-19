@@ -8,6 +8,8 @@
 #include "shader_recompiler/frontend/fetch_shader.h"
 #include "shader_recompiler/frontend/translate/translate.h"
 #include "shader_recompiler/info.h"
+#include "shader_recompiler/ir/attribute.h"
+#include "shader_recompiler/ir/reg.h"
 #include "shader_recompiler/runtime_info.h"
 #include "video_core/amdgpu/resource.h"
 #include "video_core/amdgpu/types.h"
@@ -51,12 +53,43 @@ void Translator::EmitPrologue() {
             ir.SetVectorReg(dst_vreg++, ir.GetAttributeU32(IR::Attribute::InstanceId));
         }
         break;
-    case LogicalStage::TessellationControl:
-        ir.SetVectorReg(IR::VectorReg::V0, ir.GetAttributeU32(IR::Attribute::PrimitiveId));
+    case LogicalStage::TessellationControl: {
+        IR::U32 invocation_info = ir.Imm32(0U);
+        invocation_info =
+            ir.BitFieldInsert(invocation_info, ir.GetAttributeU32(IR::Attribute::PrimitiveId),
+                              ir.Imm32(0), ir.Imm32(8U));
+        // TODO make sure patches have max 32 vertices
+        invocation_info =
+            ir.BitFieldInsert(invocation_info, ir.GetAttributeU32(IR::Attribute::InvocationId),
+                              ir.Imm32(8U), ir.Imm32(5U));
+        // V1: vertex_id_in_output_patch [0:4] | in/out_patch_id [0:8]
+        ir.SetVectorReg(IR::VectorReg::V1, invocation_info);
+
+        // v_bfe_u32       v0, v1, 8, 5
+        ir.SetVectorReg(IR::VectorReg::V0, ir.GetAttributeU32(IR::Attribute::InvocationId));
+        // v_bfe_u32       v2, v1, 0, 8
+        ir.SetVectorReg(IR::VectorReg::V2, ir.GetAttributeU32(IR::Attribute::PrimitiveId));
+        // TODO V0 and V2 will get overwritten with bitfieldextract unless we eat those bfe during
+        // translate
+
+        // TODO: for cleaner solution, do SROA (scalar replacement of aggregates) on bitfield
+        // members
+
+        // If input and output topo are the same, copy inputs to outputs by InvocationID, to
+        // handle the passthrough case
+        // TODO: do this later, and not if uneccessary
+        if (true) {
+
+            // for (auto i = 0; i < info.)
+            ir.TcsOutputBarrier();
+        }
         break;
+    }
     case LogicalStage::TessellationEval:
-        ir.SetVectorReg(IR::VectorReg::V0, ir.GetAttribute(IR::Attribute::TessellationEvaluationPointU));
-        ir.SetVectorReg(IR::VectorReg::V1, ir.GetAttribute(IR::Attribute::TessellationEvaluationPointV));
+        ir.SetVectorReg(IR::VectorReg::V0,
+                        ir.GetAttribute(IR::Attribute::TessellationEvaluationPointU));
+        ir.SetVectorReg(IR::VectorReg::V1,
+                        ir.GetAttribute(IR::Attribute::TessellationEvaluationPointV));
         ir.SetVectorReg(IR::VectorReg::V2, ir.GetAttributeU32(IR::Attribute::PrimitiveId));
         break;
     case LogicalStage::Fragment:
@@ -465,7 +498,8 @@ void Translate(IR::Block* block, u32 pc, std::span<const GcnInst> inst_list, Inf
 
         // Special case for emitting fetch shader.
         if (inst.opcode == Opcode::S_SWAPPC_B64) {
-            ASSERT(info.stage == Stage::Vertex || info.stage == Stage::Export || info.stage == Stage::Local);
+            ASSERT(info.stage == Stage::Vertex || info.stage == Stage::Export ||
+                   info.stage == Stage::Local);
             translator.EmitFetch(inst);
             continue;
         }
