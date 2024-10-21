@@ -66,7 +66,7 @@ namespace Shader::Optimization {
  * Must be placed in uniform control flow
  */
 
-void HullShaderTransform(const IR::Program& program) {
+void HullShaderTransform(const IR::Program& program, const RuntimeInfo& runtime_info) {
     LOG_INFO(Render_Vulkan, "{}", IR::DumpProgram(program));
     for (IR::Block* block : program.blocks) {
         for (IR::Inst& inst : block->Instructions()) {

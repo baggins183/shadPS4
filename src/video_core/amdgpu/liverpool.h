@@ -1058,6 +1058,17 @@ struct Liverpool {
         BitField<5, 3, TessellationTopology> topology;
     };
 
+    union TessFactorMemoryBase {
+        // TODO: was going to use this to check against UD used in tcs shader
+        // but only seen set to 0
+        // Remove this and other added regs if they end up unused
+        u32 base;
+
+        u64 MemoryBase() const {
+            return static_cast<u64>(base) << 8;
+        }
+    };
+
     union Eqaa {
         u32 raw;
         BitField<0, 1, u32> max_anchor_samples;
@@ -1190,6 +1201,8 @@ struct Liverpool {
             INSERT_PADDING_WORDS(0xC24C - 0xC243);
             u32 num_indices;
             VgtNumInstances num_instances;
+            INSERT_PADDING_WORDS(0xC250 - 0xC24D - 1);
+            TessFactorMemoryBase vgt_tf_memory_base;
         };
         std::array<u32, NumRegs> reg_array{};
 
@@ -1429,6 +1442,7 @@ static_assert(GFX6_3D_REG_INDEX(color_buffers[0].slice) == 0xA31A);
 static_assert(GFX6_3D_REG_INDEX(color_buffers[7].base_address) == 0xA381);
 static_assert(GFX6_3D_REG_INDEX(primitive_type) == 0xC242);
 static_assert(GFX6_3D_REG_INDEX(num_instances) == 0xC24D);
+static_assert(GFX6_3D_REG_INDEX(vgt_tf_memory_base) == 0xc250);
 
 #undef GFX6_3D_REG_INDEX
 

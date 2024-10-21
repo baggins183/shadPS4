@@ -88,7 +88,7 @@ IR::Program TranslateProgram(std::span<const u32> code, Pools& pools, Info& info
     }
     if (stage == Stage::Hull) {
         dumpMatchingIR("pre_hull");
-        Shader::Optimization::HullShaderTransform(program);
+        Shader::Optimization::HullShaderTransform(program, runtime_info);
         dumpMatchingIR("post_hull");
     }
     Shader::Optimization::ConstantPropagationPass(program.post_order_blocks);

@@ -86,8 +86,15 @@ struct VertexRuntimeInfo {
 
 struct HullRuntimeInfo {
     u32 output_control_points;
+    // trying to debug
+    u32 input_control_points;
+    u32 num_patches;
+    u32 num_instances;
+    u64 tess_factor_memory_base;
 
-    auto operator<=>(const HullRuntimeInfo&) const noexcept = default;
+    bool operator==(const HullRuntimeInfo& other) const noexcept {
+        return output_control_points == other.output_control_points;
+    }
 };
 
 static constexpr auto GsMaxOutputStreams = 4u;

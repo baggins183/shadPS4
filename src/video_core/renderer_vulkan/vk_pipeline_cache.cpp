@@ -100,6 +100,11 @@ Shader::RuntimeInfo PipelineCache::BuildRuntimeInfo(Stage stage, LogicalStage l_
     case Stage::Hull: {
         BuildCommon(regs.hs_program);
         info.hs_info.output_control_points = regs.ls_hs_config.hs_output_control_points.Value();
+        info.hs_info.input_control_points = regs.ls_hs_config.hs_input_control_points;
+        info.hs_info.num_patches = regs.ls_hs_config.num_patches;
+        // Suspicious about this in apparently "passthrough" hull shader. Probably not releva
+        info.hs_info.num_instances = regs.num_instances.NumInstances();
+        info.hs_info.tess_factor_memory_base = regs.vgt_tf_memory_base.MemoryBase();
         break;
     }
     case Stage::Export: {
