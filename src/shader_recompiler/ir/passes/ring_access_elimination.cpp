@@ -126,7 +126,7 @@ void RingAccessElimination(const IR::Program& program, const RuntimeInfo& runtim
         });
         break;
     }
-    case SwHwStagePerm::gs_copy_vs: {
+    case SwHwStagePerm::vertex_es: {
         ForEachInstruction([=](IR::IREmitter& ir, IR::Inst& inst) {
             const auto opcode = inst.GetOpcode();
             switch (opcode) {
