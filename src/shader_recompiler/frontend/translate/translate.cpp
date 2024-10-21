@@ -79,7 +79,13 @@ void Translator::EmitPrologue() {
         // handle the passthrough case
         // TODO: do this later, and not if uneccessary
         if (true) {
-
+            // TODO: ctreate if stmt control flow:
+            // if (invocationID < gl_PatchVerticesIn) {
+            //     out_attr[invocationID][0] = in_attr[invocationID][0];
+            //     out_attr[invocationID][1] = in_attr[invocationID][1];
+            //     ...
+            //     out_attr[invocationID][N] = in_attr[invocationID][N];
+            //}
             // for (auto i = 0; i < info.)
             ir.TcsOutputBarrier();
         }
