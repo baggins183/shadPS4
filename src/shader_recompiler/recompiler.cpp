@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: Copyright 2024 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include "common/config.h"
+#include "common/io_file.h"
+#include "common/path_util.h"
 #include "shader_recompiler/frontend/control_flow_graph.h"
 #include "shader_recompiler/frontend/decode.h"
 #include "shader_recompiler/frontend/structured_control_flow.h"
@@ -52,6 +55,14 @@ IR::Program TranslateProgram(const std::span<const u32>& code, Pools& pools, Inf
     // Create control flow graph
     Common::ObjectPool<Gcn::Block> gcn_block_pool{64};
     Gcn::CFG cfg{gcn_block_pool, program.ins_list};
+
+    auto dump_ir = [&](std::string phase) {
+        const auto ir_filename =
+            fmt::format("{}_{:#018x}.{}.ir.txt", info.stage, info.pgm_hash, phase);
+        if (Config::dumpShaders()) {
+            IR::DumpIrProgram(program, info, ir_filename);
+        }
+    };
 
     // Structurize control flow graph and create program.
     program.syntax_list =

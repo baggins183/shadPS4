@@ -21,6 +21,7 @@ struct Program {
     Info& info;
 };
 
+void DumpIrProgram(const Program& program, const Info& info, const std::string& ir_filename);
 void DumpProgram(const Program& program, const Info& info, const std::string& type = "");
 
 } // namespace Shader::IR
