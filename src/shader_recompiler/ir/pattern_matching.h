@@ -4,7 +4,7 @@
 #include "shader_recompiler/ir/attribute.h"
 #include "shader_recompiler/ir/value.h"
 
-namespace Shader::Optimiation::PatternMatching {
+namespace Shader::Optimization::PatternMatching {
 
 // Attempt at pattern matching for Insts and Values
 // Needs improvement, mostly a convenience
@@ -126,4 +126,4 @@ inline auto MakeInstPattern(Args&&... args) {
 #define M_COMPOSITECONSTRUCTU32X4(...)                                                             \
     MakeInstPattern<IR::Opcode::CompositeConstructU32x4>(__VA_ARGS__)
 
-} // namespace Shader::Optimiation::PatternMatching
+} // namespace Shader::Optimization::PatternMatching
