@@ -149,6 +149,11 @@ void Visit(Info& info, const IR::Inst& inst) {
     case IR::Opcode::UnpackUfloat10_11_11:
         info.uses_unpack_10_11_11 = true;
         break;
+    case IR::Opcode::OrderedCount: {
+        u32 packer_id = inst.Arg(0).U32();
+        info.num_ordered_count_packers = std::max(info.num_ordered_count_packers, packer_id + 1);
+        break;
+    }
     default:
         break;
     }
@@ -178,6 +183,15 @@ void CollectShaderInfoPass(IR::Program& program, const Profile& profile) {
             .used_types = IR::Type::U32,
             .inline_cbuf = AmdGpu::Buffer::Placeholder(std::numeric_limits<u32>::max()),
             .buffer_type = BufferType::FaultBuffer,
+            .is_written = true,
+        });
+    }
+
+    if (info.UsesOrderedCount()) {
+        info.buffers.push_back({
+            .used_types = IR::Type::U32,
+            .inline_cbuf = AmdGpu::Buffer::Placeholder(std::numeric_limits<u32>::max()),
+            .buffer_type = BufferType::OrderedCountScratch,
             .is_written = true,
         });
     }

@@ -82,6 +82,8 @@ void Translator::EmitDataShare(const GcnInst& inst) {
         return DS_READ(64, false, true, false, inst);
     case Opcode::DS_READ2ST64_B64:
         return DS_READ(64, false, true, true, inst);
+    case Opcode::DS_ORDERED_COUNT:
+        return DS_ORDERED_COUNT(inst);
     default:
         LogMissingOpcode(inst);
     }
@@ -332,6 +334,13 @@ void Translator::DS_CONSUME(const GcnInst& inst) {
     const IR::U32 gds_offset = ir.IAdd(ir.GetM0(), ir.Imm32(inst_offset));
     const IR::U32 prev = ir.DataConsume(gds_offset);
     SetDst(inst.dst[0], prev);
+}
+
+void Translator::DS_ORDERED_COUNT(const GcnInst& inst) {
+    // TODO?
+    ASSERT_MSG(info.l_stage == LogicalStage::Compute, "Only supported in compute");
+    const u32 packer_id = inst.control.ds.offset0 >> 2;
+    SetDst(inst.dst[0], ir.OrderedCount(ir.Imm32(packer_id)));
 }
 
 } // namespace Shader::Gcn

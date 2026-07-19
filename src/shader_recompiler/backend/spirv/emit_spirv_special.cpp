@@ -11,7 +11,12 @@ void EmitPrologue(EmitContext& ctx) {
     if (ctx.stage == Stage::Fragment) {
         ctx.DefineAmdPerVertexAttribs();
     }
-    if (ctx.info.loads.Get(IR::Attribute::WorkgroupIndex)) {
+    if (ctx.info.UsesOrderedCount()) {
+        ctx.InitEmulatedWorkgroupIndex();
+        if (ctx.info.loads.Get(IR::Attribute::WorkgroupId)) {
+            ctx.InitEmulatedWorkgroupId();
+        }
+    } else if (ctx.info.loads.Get(IR::Attribute::WorkgroupIndex)) {
         ctx.DefineWorkgroupIndex();
     }
     ctx.DefineBufferProperties();

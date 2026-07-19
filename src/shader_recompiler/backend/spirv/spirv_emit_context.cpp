@@ -293,6 +293,7 @@ void EmitContext::DefineAmdPerVertexAttribs() {
 }
 
 void EmitContext::DefineWorkgroupIndex() {
+    ASSERT(!info.UsesOrderedCount());
     const Id workgroup_id_val{OpLoad(U32[3], workgroup_id)};
     const Id workgroup_x{OpCompositeExtract(U32[1], workgroup_id_val, 0)};
     const Id workgroup_y{OpCompositeExtract(U32[1], workgroup_id_val, 1)};
@@ -307,10 +308,17 @@ void EmitContext::DefineWorkgroupIndex() {
 }
 
 void EmitContext::DefineInputs() {
-    if (info.uses_lane_id) {
+    if (info.uses_lane_id || info.UsesOrderedCount()) {
         subgroup_local_invocation_id = DefineVariable(
             U32[1], spv::BuiltIn::SubgroupLocalInvocationId, spv::StorageClass::Input);
-        Decorate(subgroup_local_invocation_id, spv::Decoration::Flat);
+        Decorate(subgroup_local_invocation_id, spv::Decoration::Flat); // TODO Flat?
+    }
+    if (info.UsesOrderedCount()) {
+        subgroup_id = DefineVariable(U32[1], spv::BuiltIn::SubgroupId, spv::StorageClass::Input);
+        num_subgroups =
+            DefineVariable(U32[1], spv::BuiltIn::NumSubgroups, spv::StorageClass::Input);
+        local_invocation_index =
+            DefineVariable(U32[1], spv::BuiltIn::LocalInvocationIndex, spv::StorageClass::Input);
     }
     switch (l_stage) {
     case LogicalStage::Vertex: {
@@ -449,12 +457,13 @@ void EmitContext::DefineInputs() {
         break;
     }
     case LogicalStage::Compute:
-        if (info.loads.GetAny(IR::Attribute::WorkgroupIndex) ||
-            info.loads.GetAny(IR::Attribute::WorkgroupId)) {
+        if ((info.loads.GetAny(IR::Attribute::WorkgroupIndex) ||
+             info.loads.GetAny(IR::Attribute::WorkgroupId)) &&
+            !info.UsesOrderedCount()) {
             workgroup_id =
                 DefineVariable(U32[3], spv::BuiltIn::WorkgroupId, spv::StorageClass::Input);
         }
-        if (info.loads.GetAny(IR::Attribute::WorkgroupIndex)) {
+        if (info.loads.GetAny(IR::Attribute::WorkgroupIndex) || info.UsesOrderedCount()) {
             num_workgroups_id =
                 DefineVariable(U32[3], spv::BuiltIn::NumWorkgroups, spv::StorageClass::Input);
         }
@@ -801,6 +810,9 @@ EmitContext::BufferSpv EmitContext::DefineBuffer(bool is_storage, bool is_writte
     case BufferType::SharedMemory:
         Name(id, "ssbo_shmem");
         break;
+    case BufferType::OrderedCountScratch:
+        Name(id, "ordered_count_scratch");
+        break;
     default:
         Name(id, fmt::format("{}_{}", is_storage ? "ssbo" : "ubo", binding.buffer));
         break;
@@ -821,6 +833,8 @@ void EmitContext::DefineBuffers() {
             bda_pagetable_index = buffers.size();
         } else if (desc.buffer_type == BufferType::FaultBuffer) {
             fault_buffer_index = buffers.size();
+        } else if (desc.buffer_type == BufferType::OrderedCountScratch) {
+            ordered_count_scratch_index = buffers.size();
         }
 
         // Define aliases depending on the shader usage.
@@ -1261,6 +1275,9 @@ void EmitContext::DefineFunctions() {
     if (True(info.readconst_types & Info::ReadConstType::Dynamic)) {
         LOG_DEBUG(Render_Recompiler, "Shader {:#x} uses dynamic ReadConst", info.pgm_hash);
         read_const_dynamic = DefineReadConst(true);
+    }
+    if (info.num_ordered_count_packers > 0) {
+        ordered_count_function = DefineOrderedCountFunction();
     }
 }
 

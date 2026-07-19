@@ -48,6 +48,9 @@ public:
     void DefineAmdPerVertexAttribs();
     void DefineWorkgroupIndex();
 
+    void InitEmulatedWorkgroupIndex();
+    void InitEmulatedWorkgroupId();
+
     [[nodiscard]] Id DefineInput(Id type, std::optional<u32> location = std::nullopt,
                                  std::optional<spv::BuiltIn> builtin = std::nullopt) {
         const Id input_id{DefineVariable(type, builtin, spv::StorageClass::Input)};
@@ -274,6 +277,9 @@ public:
     Id local_invocation_id{};
     Id invocation_id{};
     Id subgroup_local_invocation_id{};
+    Id subgroup_id{};
+    Id num_subgroups{};
+    Id local_invocation_index{};
     Id image_u32{};
     Id image_f32{};
 
@@ -290,6 +296,8 @@ public:
     Id bary_coord_smooth_sample{};
     Id bary_coord_nopersp{};
     Id bary_coord_nopersp_sample{};
+
+    Id emulated_workgroup_id_id{};
 
     struct TextureDefinition {
         const VectorIds* data_types;
@@ -352,6 +360,7 @@ public:
     size_t flatbuf_index{};
     size_t bda_pagetable_index{};
     size_t fault_buffer_index{};
+    size_t ordered_count_scratch_index{};
     Id physical_pointer_type_u32;
 
     Id sampler_type{};
@@ -385,6 +394,8 @@ public:
     Id read_const{};
     Id read_const_dynamic{};
 
+    Id ordered_count_function{};
+
 private:
     void DefineArithmeticTypes();
     void DefineInterfaces();
@@ -411,6 +422,8 @@ private:
     Id DefineReadConst(bool dynamic);
 
     Id GetBufferSize(u32 sharp_idx);
+
+    Id DefineOrderedCountFunction();
 };
 
 } // namespace Shader::Backend::SPIRV

@@ -1315,7 +1315,8 @@ void Translator::V_CMP_CLASS_F32(const GcnInst& inst) {
     IR::U1 value;
     if (src1.IsImmediate()) {
         const auto class_mask = static_cast<IR::FloatClassFunc>(src1.U32());
-        if ((class_mask & IR::FloatClassFunc::NaN) == IR::FloatClassFunc::NaN) {
+        if (True(class_mask & IR::FloatClassFunc::QuietNan) ||
+            True(class_mask & IR::FloatClassFunc::SignalingNan)) {
             value = ir.FPIsNan(src0);
         } else if ((class_mask & IR::FloatClassFunc::Infinity) == IR::FloatClassFunc::Infinity) {
             value = ir.FPIsInf(src0);

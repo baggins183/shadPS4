@@ -326,6 +326,7 @@ public:
     void DS_SWIZZLE_B32(const GcnInst& inst);
     void DS_APPEND(const GcnInst& inst);
     void DS_CONSUME(const GcnInst& inst);
+    void DS_ORDERED_COUNT(const GcnInst& inst);
 
     // Buffer Memory
     // MUBUF / MTBUF

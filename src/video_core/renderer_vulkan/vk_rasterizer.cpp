@@ -666,6 +666,13 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, Shader::Backend::Binding
                 const auto [data, offset] = lds_buffer.Map(lds_size, alignment);
                 std::memset(data, 0, lds_size);
                 buffer_infos.emplace_back(lds_buffer.Handle(), offset, lds_size);
+            } else if (desc.buffer_type == Shader::BufferType::OrderedCountScratch) {
+                auto& ordered_count_buffer =
+                    buffer_cache.GetUtilityBuffer(VideoCore::MemoryUsage::DeviceLocal);
+                const auto scratch_size = 12; // TODO header
+                const auto [data, offset] = ordered_count_buffer.Map(scratch_size, alignment);
+                std::memset(data, 0, scratch_size);
+                buffer_infos.emplace_back(ordered_count_buffer.Handle(), offset, scratch_size);
             } else {
                 buffer_infos.emplace_back(VK_NULL_HANDLE, 0, VK_WHOLE_SIZE);
             }

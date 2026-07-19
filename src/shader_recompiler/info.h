@@ -146,6 +146,7 @@ struct Info : InfoPersistent {
     bool uses_shared_int64_atomics{};
     bool stores_tess_level_outer{};
     bool stores_tess_level_inner{};
+    u32 num_ordered_count_packers{};
     bool translation_failed{};
 
     std::array<Interpolation, IR::NumParams> fs_interpolation{};
@@ -205,6 +206,10 @@ struct Info : InfoPersistent {
         memcpy(&tess_constants,
                reinterpret_cast<TessellationDataConstantBuffer*>(tess_constants_addr),
                sizeof(tess_constants));
+    }
+
+    bool UsesOrderedCount() const {
+        return num_ordered_count_packers > 0;
     }
 
     void Serialize(Serialization::Archive& ar) const;
