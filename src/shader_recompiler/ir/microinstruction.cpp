@@ -85,6 +85,7 @@ bool Inst::MayHaveSideEffects() const noexcept {
     case Opcode::BufferAtomicFCmpSwap32:
     case Opcode::DataAppend:
     case Opcode::DataConsume:
+    case Opcode::OrderedCount:
     case Opcode::WriteSharedU16:
     case Opcode::WriteSharedU32:
     case Opcode::WriteSharedU64:
