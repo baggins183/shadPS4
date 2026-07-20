@@ -12,6 +12,7 @@ using OpcodeVOP1 = Shader::Gcn::OpcodeVOP1;
 using OpcodeVOP2 = Shader::Gcn::OpcodeVOP2;
 using OpcodeVOP3 = Shader::Gcn::OpcodeVOP3;
 using OpcodeVOP3P = Shader::Gcn::OpcodeVOP3P;
+using OpcodeDS = Shader::Gcn::OpcodeDS;
 
 enum class VOperand8 : u8 {
     V0 = 0,
@@ -1198,7 +1199,8 @@ enum class Omod : u8 {
 
 class VOP3A {
 public:
-    explicit constexpr VOP3A(OpcodeVOP3 op, VOperand8 vdst, SOperand9 src0, SOperand9 src1, SOperand9 src2 = SOperand9::S0) {
+    explicit constexpr VOP3A(OpcodeVOP3 op, VOperand8 vdst, SOperand9 src0, SOperand9 src1,
+                             SOperand9 src2 = SOperand9::S0) {
         i.src0 = std::to_underlying(src0);
         i.src1 = std::to_underlying(src1);
         i.src2 = std::to_underlying(src2);
@@ -1273,7 +1275,8 @@ private:
 
 class VOP3P {
 public:
-    explicit constexpr VOP3P(OpcodeVOP3P op, VOperand8 vdst, SOperand9 src0, SOperand9 src1, SOperand9 src2 = SOperand9::S0) {
+    explicit constexpr VOP3P(OpcodeVOP3P op, VOperand8 vdst, SOperand9 src0, SOperand9 src1,
+                             SOperand9 src2 = SOperand9::S0) {
         i.src0 = std::to_underlying(src0);
         i.src1 = std::to_underlying(src1);
         i.src2 = std::to_underlying(src2);
@@ -1348,4 +1351,41 @@ private:
     } i{};
 
     static_assert(sizeof(VOP3PInternal) == sizeof(u64));
+};
+
+class DS {
+public:
+    explicit constexpr DS(OpcodeDS op, VOperand8 vdst, VOperand8 data0, VOperand8 data1,
+                          VOperand8 addr, u8 offset0, u8 offset1, bool gds) {
+        i.offset0 = offset0;
+        i.offset1 = offset1;
+        i.reserved = 0;
+        i.gds = gds;
+        i.op = std::to_underlying(op);
+        i.encoding = 0b110110;
+        i.addr = std::to_underlying(addr);
+        i.data0 = std::to_underlying(data0);
+        i.data1 = std::to_underlying(data1);
+        i.vdst = std::to_underlying(vdst);
+    }
+
+    u64 Get() {
+        return std::bit_cast<u64>(i);
+    }
+
+private:
+    struct DSInternal {
+        u64 offset0 : 8;
+        u64 offset1 : 8;
+        u64 reserved : 1;
+        u64 gds : 1;
+        u64 op : 8;
+        u64 encoding : 6;
+        u64 addr : 8;
+        u64 data0 : 8;
+        u64 data1 : 8;
+        u64 vdst : 8;
+    } i;
+
+    static_assert(sizeof(DSInternal) == sizeof(u64));
 };
