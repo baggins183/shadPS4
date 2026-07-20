@@ -3,9 +3,11 @@
 
 #include <cmath>
 
+#include <fmt/format.h>
 #include <gtest/gtest.h>
 #include <half.hpp>
 
+#include "common/io_file.h"
 #include "gcn_test_runner.hpp"
 #include "instructions.hpp"
 #include "translator.hpp"
@@ -652,6 +654,14 @@ TEST_F(GcnTest, ds_ordered_count) {
     auto spirv = TranslateToSpirv(DS(OpcodeDS::DS_ORDERED_COUNT, VOperand8::V0, VOperand8::V1,
                                      VOperand8::V2, VOperand8::V3, packer_id << 2, 0, true)
                                       .Get());
+
+    {
+        // TODO delete
+        const auto filename = fmt::format("{}.spv", test_info_->test_case_name());
+        const auto file = Common::FS::IOFile{filename, Common::FS::FileAccessMode::Create};
+        file.WriteSpan(std::span<const u32>(spirv));
+    }
+
     auto result = runner->run<u32>(spirv, std::array{0, 0, 0, 0});
 
     EXPECT_TRUE(result.has_value());

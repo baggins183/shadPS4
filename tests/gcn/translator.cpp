@@ -68,6 +68,7 @@ std::vector<u32> TranslateToSpirv(std::span<const u64> raw_gcn_insts) {
     Profile profile{};
     profile.supported_spirv = 0x00010600;
     profile.subgroup_size = 32;
+    profile.max_shared_memory_size = 128;
 
     RuntimeInfo runtime_info{};
     runtime_info.Initialize(Stage::Compute);
