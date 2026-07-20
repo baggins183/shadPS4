@@ -359,6 +359,14 @@ void SetupCapabilities(const Info& info, const Profile& profile, const RuntimeIn
         }
         ctx.AddCapability(spv::Capability::Int64Atomics);
     }
+    if (info.UsesOrderedCount()) {
+        ctx.AddExtension("SPV_KHR_workgroup_memory_explicit_layout");
+        ctx.AddExtension("SPV_KHR_shader_ballot");
+        ctx.AddCapability(spv::Capability::WorkgroupMemoryExplicitLayoutKHR);
+        ctx.AddCapability(spv::Capability::GroupNonUniform);
+        ctx.AddCapability(spv::Capability::GroupNonUniformBallot);
+        ctx.AddCapability(spv::Capability::GroupNonUniformArithmetic);
+    }
 }
 
 void DefineEntryPoint(const Info& info, EmitContext& ctx, Id main) {

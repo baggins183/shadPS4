@@ -395,7 +395,7 @@ public:
     // Ordered count stuff
     Id ordered_count_function{};
     Id emulated_workgroup_id_id{};
-    Id ordered_count_scratch_mem_variable{};
+    Id ordered_count_shared_mem_variable{};
     u32 max_num_subgroups{};
     Id ordered_count_subgroup_counts_array_type{};
 

@@ -1099,6 +1099,8 @@ void EmitContext::DefineSharedMemory() {
         u32 shared_mem_ordered_count_size = 4 * max_num_subgroups + 4;
 
         ordered_count_subgroup_counts_array_type = TypeArray(U32[1], ConstU32(max_num_subgroups));
+        Decorate(ordered_count_subgroup_counts_array_type, spv::Decoration::ArrayStride, 4);
+
         const Id struct_type{
             TypeStruct(ordered_count_subgroup_counts_array_type, /*scratch*/ U32[1])};
         Decorate(struct_type, spv::Decoration::Block);
@@ -1109,10 +1111,13 @@ void EmitContext::DefineSharedMemory() {
                        shared_mem_ordered_count_base + 4 * max_num_subgroups);
 
         const Id pointer = TypePointer(spv::StorageClass::Workgroup, struct_type);
-        ordered_count_scratch_mem_variable =
+        ordered_count_shared_mem_variable =
             AddGlobalVariable(pointer, spv::StorageClass::Workgroup);
-        Name(ordered_count_scratch_mem_variable, "shared_mem_ordered_count_scratch");
-        interfaces.push_back(ordered_count_scratch_mem_variable);
+        if (num_types > 1) {
+            Decorate(ordered_count_shared_mem_variable, spv::Decoration::Aliased);
+        }
+        Name(ordered_count_shared_mem_variable, "shared_mem_ordered_count");
+        interfaces.push_back(ordered_count_shared_mem_variable);
 
         shared_mem_total_size = shared_mem_ordered_count_base + shared_mem_ordered_count_size;
     }
@@ -1324,7 +1329,7 @@ void EmitContext::DefineFunctions() {
         LOG_DEBUG(Render_Recompiler, "Shader {:#x} uses dynamic ReadConst", info.pgm_hash);
         read_const_dynamic = DefineReadConst(true);
     }
-    if (info.num_ordered_count_packers > 0) {
+    if (info.UsesOrderedCount()) {
         ordered_count_function = DefineOrderedCountFunction();
     }
 }
