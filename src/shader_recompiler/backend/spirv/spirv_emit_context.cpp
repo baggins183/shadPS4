@@ -1025,12 +1025,23 @@ void EmitContext::DefineImagesAndSamplers() {
 }
 
 void EmitContext::DefineSharedMemory() {
-    const auto num_types = std::popcount(static_cast<u32>(info.shared_types));
+    if (info.stage != Stage::Compute) {
+        return;
+    }
+    const auto num_guest_types = std::popcount(static_cast<u32>(info.shared_types));
+
+    u32 num_types = num_guest_types;
+    num_types += info.UsesOrderedCount() ? 1 : 0;
+
     if (num_types == 0) {
         return;
     }
-    ASSERT(info.stage == Stage::Compute);
-    const u32 shared_memory_size = runtime_info.cs_info.shared_memory_size;
+
+    u32 shared_mem_total_size = 0;
+
+    const u32 shared_mem_guest_base = 0;
+    const u32 shared_memory_guest_size = runtime_info.cs_info.shared_memory_size;
+    shared_mem_total_size = shared_mem_guest_base + shared_memory_guest_size;
 
     const auto make_type = [&](IR::Type type, Id element_type, u32 element_size,
                                std::string_view name) {
@@ -1039,14 +1050,14 @@ void EmitContext::DefineSharedMemory() {
             return std::make_tuple(Id{}, Id{}, Id{});
         }
 
-        const u32 num_elements{Common::DivCeil(shared_memory_size, element_size)};
+        const u32 num_elements{Common::DivCeil(shared_memory_guest_size, element_size)};
         const Id array_type{TypeArray(element_type, ConstU32(num_elements))};
 
         const auto mem_type = [&] {
             if (num_types > 1) {
                 const Id struct_type{TypeStruct(array_type)};
                 Decorate(struct_type, spv::Decoration::Block);
-                MemberDecorate(struct_type, 0u, spv::Decoration::Offset, 0u);
+                MemberDecorate(struct_type, 0u, spv::Decoration::Offset, shared_mem_guest_base);
                 return struct_type;
             } else {
                 return array_type;
@@ -1072,6 +1083,43 @@ void EmitContext::DefineSharedMemory() {
         make_type(IR::Type::U32, U32[1], 4u, "shared_mem_u32");
     std::tie(shared_memory_u64, shared_u64, shared_memory_u64_type) =
         make_type(IR::Type::U64, U64, 8u, "shared_mem_u64");
+
+    // For now, only one scenario where we need scratch memory (shader has DS_ORDERED_COUNT)
+    if (info.UsesOrderedCount()) {
+        const u32 shared_mem_ordered_count_base =
+            Common::AlignUp(shared_mem_total_size, 32 /*TODO*/);
+
+        const auto& threadgroup_dims = runtime_info.cs_info.workgroup_size;
+        const u32 threadgroup_size =
+            threadgroup_dims[0] * threadgroup_dims[1] * threadgroup_dims[2];
+        // TODO: this is potentially innacurate, may need to be conservative or mess with
+        // VK_EXT_subgroup_size_control
+        max_num_subgroups = Common::DivCeil(threadgroup_size, profile.subgroup_size);
+
+        u32 shared_mem_ordered_count_size = 4 * max_num_subgroups + 4;
+
+        ordered_count_subgroup_counts_array_type = TypeArray(U32[1], ConstU32(max_num_subgroups));
+        const Id struct_type{
+            TypeStruct(ordered_count_subgroup_counts_array_type, /*scratch*/ U32[1])};
+        Decorate(struct_type, spv::Decoration::Block);
+        MemberName(struct_type, 0, "subgroup_counts");
+        MemberDecorate(struct_type, 0u, spv::Decoration::Offset, shared_mem_ordered_count_base);
+        MemberName(struct_type, 1, "scratch_val");
+        MemberDecorate(struct_type, 1u, spv::Decoration::Offset,
+                       shared_mem_ordered_count_base + 4 * max_num_subgroups);
+
+        const Id pointer = TypePointer(spv::StorageClass::Workgroup, struct_type);
+        ordered_count_scratch_mem_variable =
+            AddGlobalVariable(pointer, spv::StorageClass::Workgroup);
+        Name(ordered_count_scratch_mem_variable, "shared_mem_ordered_count_scratch");
+        interfaces.push_back(ordered_count_scratch_mem_variable);
+
+        shared_mem_total_size = shared_mem_ordered_count_base + shared_mem_ordered_count_size;
+    }
+
+    ASSERT(shared_mem_total_size < profile.max_shared_memory_size);
+
+    // TODO probably need to make work without explicit workgroup layout ext
 }
 
 Id EmitContext::DefineFloat32ToUfloatM5(u32 mantissa_bits, const std::string_view name) {

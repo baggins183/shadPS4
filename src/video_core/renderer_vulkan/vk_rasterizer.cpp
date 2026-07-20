@@ -5,6 +5,7 @@
 #include "core/debug_state.h"
 #include "core/emulator_settings.h"
 #include "core/memory.h"
+#include "shader_recompiler/ordered_count.h"
 #include "shader_recompiler/runtime_info.h"
 #include "video_core/amdgpu/liverpool.h"
 #include "video_core/renderer_vulkan/liverpool_to_vk.h"
@@ -669,7 +670,8 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, Shader::Backend::Binding
             } else if (desc.buffer_type == Shader::BufferType::OrderedCountScratch) {
                 auto& ordered_count_buffer =
                     buffer_cache.GetUtilityBuffer(VideoCore::MemoryUsage::DeviceLocal);
-                const auto scratch_size = 12; // TODO header
+                const auto scratch_size =
+                    OrderedCount::ScratchBufferSize; // TODO support multiple packers
                 const auto [data, offset] = ordered_count_buffer.Map(scratch_size, alignment);
                 std::memset(data, 0, scratch_size);
                 buffer_infos.emplace_back(ordered_count_buffer.Handle(), offset, scratch_size);

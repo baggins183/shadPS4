@@ -297,8 +297,6 @@ public:
     Id bary_coord_nopersp{};
     Id bary_coord_nopersp_sample{};
 
-    Id emulated_workgroup_id_id{};
-
     struct TextureDefinition {
         const VectorIds* data_types;
         Id id;
@@ -394,7 +392,12 @@ public:
     Id read_const{};
     Id read_const_dynamic{};
 
+    // Ordered count stuff
     Id ordered_count_function{};
+    Id emulated_workgroup_id_id{};
+    Id ordered_count_scratch_mem_variable{};
+    u32 max_num_subgroups{};
+    Id ordered_count_subgroup_counts_array_type{};
 
 private:
     void DefineArithmeticTypes();
