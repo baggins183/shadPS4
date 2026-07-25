@@ -73,7 +73,7 @@ enum class BufferType : u8 {
     GdsBuffer,
     SharedMemory,
     ClipPlanes,
-    OrderedCountScratch,
+    OrderedCountUtility,
 };
 
 struct BufferResource {
