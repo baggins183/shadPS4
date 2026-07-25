@@ -810,8 +810,8 @@ EmitContext::BufferSpv EmitContext::DefineBuffer(bool is_storage, bool is_writte
     case BufferType::SharedMemory:
         Name(id, "ssbo_shmem");
         break;
-    case BufferType::OrderedCountScratch:
-        Name(id, "ordered_count_scratch");
+    case BufferType::OrderedCountUtility:
+        Name(id, "ordered_count_utility");
         break;
     default:
         Name(id, fmt::format("{}_{}", is_storage ? "ssbo" : "ubo", binding.buffer));
@@ -833,7 +833,7 @@ void EmitContext::DefineBuffers() {
             bda_pagetable_index = buffers.size();
         } else if (desc.buffer_type == BufferType::FaultBuffer) {
             fault_buffer_index = buffers.size();
-        } else if (desc.buffer_type == BufferType::OrderedCountScratch) {
+        } else if (desc.buffer_type == BufferType::OrderedCountUtility) {
             ordered_count_utility_buffer_index = buffers.size();
         }
 

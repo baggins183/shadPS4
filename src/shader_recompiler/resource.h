@@ -25,7 +25,7 @@ enum class BufferType : u32 {
     GdsBuffer,
     SharedMemory,
     ClipPlanes,
-    OrderedCountScratch,
+    OrderedCountUtility,
 };
 
 struct Info;

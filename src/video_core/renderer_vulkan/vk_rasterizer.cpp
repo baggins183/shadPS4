@@ -667,7 +667,7 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, Shader::Backend::Binding
                 const auto [data, offset] = lds_buffer.Map(lds_size, alignment);
                 std::memset(data, 0, lds_size);
                 buffer_infos.emplace_back(lds_buffer.Handle(), offset, lds_size);
-            } else if (desc.buffer_type == Shader::BufferType::OrderedCountScratch) {
+            } else if (desc.buffer_type == Shader::BufferType::OrderedCountUtility) {
                 auto& ordered_count_buffer =
                     buffer_cache.GetUtilityBuffer(VideoCore::MemoryUsage::DeviceLocal);
                 const auto scratch_size = stage.OrderedCountScratchBufferSize();
