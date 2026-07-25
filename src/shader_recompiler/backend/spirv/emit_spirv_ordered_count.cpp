@@ -174,8 +174,8 @@ Id EmitContext::DefineOrderedCountFunction() {
     const Id cond_mask{OpGroupNonUniformBallot(U32[4], subgroup_scope, is_active)};
     const Id subgroup_count{OpGroupNonUniformBallotBitCount(
         U32[1], subgroup_scope, spv::GroupOperation::Reduce, cond_mask)};
-    const Id my_count_offset{OpGroupNonUniformBallotBitCount(
-        U32[1], subgroup_scope, spv::GroupOperation::ExclusiveScan, cond_mask)};
+    // const Id my_count_offset{OpGroupNonUniformBallotBitCount(
+    // U32[1], subgroup_scope, spv::GroupOperation::ExclusiveScan, cond_mask)};
 
     const Id subgroup_counts_at_subgroup_id{
         OpAccessChain(shared_u32_ptr, shared_subgroup_counts_ptr, subgroup_id_val)};
@@ -277,8 +277,9 @@ Id EmitContext::DefineOrderedCountFunction() {
 
     const Id prev_global_count_loaded_from_smem{OpLoad(U32[1], shared_scratch_val_ptr)};
     const Id my_subgroup_scan{OpLoad(U32[1], subgroup_counts_at_subgroup_id)};
-    const Id result{OpIAdd(U32[1], prev_global_count_loaded_from_smem,
-                           OpIAdd(U32[1], my_subgroup_scan, my_count_offset))};
+    // const Id result{OpIAdd(U32[1], prev_global_count_loaded_from_smem,
+    //                        OpIAdd(U32[1], my_subgroup_scan, my_count_offset))};
+    const Id result{OpIAdd(U32[1], prev_global_count_loaded_from_smem, my_subgroup_scan)};
     OpReturnValue(result);
     OpFunctionEnd();
 
