@@ -176,7 +176,7 @@ public:
     }
 
     Id EmitSharedMemoryAccess(const Id result_type, const Id shared_mem, const Id index) {
-        if (std::popcount(static_cast<u32>(info.shared_types)) > 1) {
+        if (info.UsesSharedMemoryBlocks()) {
             return OpAccessChain(result_type, shared_mem, u32_zero_value, index);
         }
         // Workgroup layout struct omitted.
