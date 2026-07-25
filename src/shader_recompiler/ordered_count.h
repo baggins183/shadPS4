@@ -11,12 +11,11 @@ namespace OrderedCount {
 static constexpr u32 ScratchBufferSize = 12;
 
 // in dwords
-namespace ScratchBufferOffsets {
-// TODO make these struct members/logical indices
+namespace UtilityBufferOffsets {
 static const u32 NextEmulatedWorkgroupIndex = 0;
 static const u32 LastCountedWorkgroup = 1;
 static const u32 GlobalCount = 2;
-} // namespace ScratchBufferOffsets
+} // namespace UtilityBufferOffsets
 
 namespace SharedMemStructIndices {
 static const u32 SubgroupCounts = 0;

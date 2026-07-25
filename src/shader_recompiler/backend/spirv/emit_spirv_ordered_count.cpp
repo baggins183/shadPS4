@@ -32,26 +32,26 @@ void SyncWorkgroupBarrier(EmitContext& ctx) {
 // This may not be enough in theory if workgroups can be unscheduled, blocking on
 // progress of others, after they've started executing.
 void EmitContext::InitEmulatedWorkgroupIndex() {
-    const auto& scratch_buffer{buffers[ordered_count_scratch_index]};
-    const auto [scratch_buffer_id, pointer_type] = scratch_buffer.Alias(PointerType::U32);
+    const auto& utility_buffer{buffers[ordered_count_utility_buffer_index]};
+    const auto [utility_buffer_id, pointer_type] = utility_buffer.Alias(PointerType::U32);
 
     const Id shared_u32_ptr{TypePointer(spv::StorageClass::Workgroup, U32[1])};
     const Id shared_scratch_val_ptr{OpAccessChain(shared_u32_ptr, ordered_count_shared_mem_variable,
                                                   ConstU32(SharedMemStructIndices::ScratchVal))};
 
-    const Id is_thread_0_label(OpLabel());
+    const Id is_first_in_workgroup_label(OpLabel());
     const Id merge_label(OpLabel());
 
     const Id local_invocation_index_val{OpLoad(U32[1], local_invocation_index)};
-    const Id is_thread_0{OpIEqual(U1[1], local_invocation_index_val, u32_zero_value)};
+    const Id is_first_in_workgroup{OpIEqual(U1[1], local_invocation_index_val, u32_zero_value)};
     OpSelectionMerge(merge_label, spv::SelectionControlMask::MaskNone);
-    OpBranchConditional(is_thread_0, is_thread_0_label, merge_label);
+    OpBranchConditional(is_first_in_workgroup, is_first_in_workgroup_label, merge_label);
 
-    AddLabel(is_thread_0_label);
+    AddLabel(is_first_in_workgroup_label);
 
     const Id emulated_block_id_assignment_ptr{
-        OpAccessChain(pointer_type, scratch_buffer_id, u32_zero_value,
-                      ConstU32(ScratchBufferOffsets::NextEmulatedWorkgroupIndex))};
+        OpAccessChain(pointer_type, utility_buffer_id, u32_zero_value,
+                      ConstU32(UtilityBufferOffsets::NextEmulatedWorkgroupIndex))};
 
     const Id device_scope{ConstU32(static_cast<u32>(spv::Scope::Device))};
     const Id workgroup_index_temp = OpAtomicIAdd(U32[1], emulated_block_id_assignment_ptr,
@@ -161,8 +161,8 @@ Id EmitContext::DefineOrderedCountFunction() {
     const Id num_subgroups_val{OpLoad(U32[1], num_subgroups)};
     const Id local_invocation_index_val{OpLoad(U32[1], local_invocation_index)};
 
-    const auto& scratch_buffer{buffers[ordered_count_scratch_index]};
-    const auto [scratch_buffer_id, pointer_type] = scratch_buffer.Alias(PointerType::U32);
+    const auto& utility_buffer{buffers[ordered_count_utility_buffer_index]};
+    const auto [utility_buffer_id, pointer_type] = utility_buffer.Alias(PointerType::U32);
 
     const Id subgroup_scope{ConstU32(static_cast<u32>(spv::Scope::Subgroup))};
     const Id device_scope{ConstU32(static_cast<u32>(spv::Scope::Device))};
@@ -251,8 +251,8 @@ Id EmitContext::DefineOrderedCountFunction() {
 
     AddLabel(loop_header_label);
 
-    const Id counter_ptr{OpAccessChain(pointer_type, scratch_buffer_id, u32_zero_value,
-                                       ConstU32(ScratchBufferOffsets::LastCountedWorkgroup))};
+    const Id counter_ptr{OpAccessChain(pointer_type, utility_buffer_id, u32_zero_value,
+                                       ConstU32(UtilityBufferOffsets::LastCountedWorkgroup))};
 
     const auto val{OpAtomicLoad(U32[1], counter_ptr, device_scope, acquire_semantics)};
 
@@ -262,8 +262,8 @@ Id EmitContext::DefineOrderedCountFunction() {
     OpBranchConditional(equals_target, poll_success_label, loop_header_label);
 
     AddLabel(poll_success_label);
-    const Id global_count_ptr{OpAccessChain(pointer_type, scratch_buffer_id, u32_zero_value,
-                                            ConstU32(ScratchBufferOffsets::GlobalCount))};
+    const Id global_count_ptr{OpAccessChain(pointer_type, utility_buffer_id, u32_zero_value,
+                                            ConstU32(UtilityBufferOffsets::GlobalCount))};
     const Id prev_global_count{
         OpAtomicIAdd(U32[1], global_count_ptr, device_scope, u32_zero_value, block_count)};
     OpAtomicStore(counter_ptr, device_scope, release_semantics,
