@@ -35,13 +35,34 @@ void EmitContext::InitEmulatedWorkgroupIndex() {
     const auto& scratch_buffer{buffers[ordered_count_scratch_index]};
     const auto [scratch_buffer_id, pointer_type] = scratch_buffer.Alias(PointerType::U32);
 
+    const Id shared_u32_ptr{TypePointer(spv::StorageClass::Workgroup, U32[1])};
+    const Id shared_scratch_val_ptr{OpAccessChain(shared_u32_ptr, ordered_count_shared_mem_variable,
+                                                  ConstU32(SharedMemStructIndices::ScratchVal))};
+
+    const Id is_thread_0_label(OpLabel());
+    const Id merge_label(OpLabel());
+
+    const Id local_invocation_index_val{OpLoad(U32[1], local_invocation_index)};
+    const Id is_thread_0{OpIEqual(U1[1], local_invocation_index_val, u32_zero_value)};
+    OpSelectionMerge(merge_label, spv::SelectionControlMask::MaskNone);
+    OpBranchConditional(is_thread_0, is_thread_0_label, merge_label);
+
+    AddLabel(is_thread_0_label);
+
     const Id emulated_block_id_assignment_ptr{
         OpAccessChain(pointer_type, scratch_buffer_id, u32_zero_value,
                       ConstU32(ScratchBufferOffsets::NextEmulatedWorkgroupIndex))};
 
     const Id device_scope{ConstU32(static_cast<u32>(spv::Scope::Device))};
-    workgroup_index_id = OpAtomicIAdd(U32[1], emulated_block_id_assignment_ptr, device_scope,
-                                      u32_zero_value, u32_one_value);
+    const Id workgroup_index_temp = OpAtomicIAdd(U32[1], emulated_block_id_assignment_ptr,
+                                                 device_scope, u32_zero_value, u32_one_value);
+    OpStore(shared_scratch_val_ptr, workgroup_index_temp);
+    OpBranch(merge_label);
+
+    AddLabel(merge_label);
+
+    SyncWorkgroupBarrier(*this);
+    workgroup_index_id = OpLoad(U32[1], shared_scratch_val_ptr);
 }
 
 void EmitContext::InitEmulatedWorkgroupId() {
@@ -145,8 +166,10 @@ Id EmitContext::DefineOrderedCountFunction() {
 
     const Id subgroup_scope{ConstU32(static_cast<u32>(spv::Scope::Subgroup))};
     const Id device_scope{ConstU32(static_cast<u32>(spv::Scope::Device))};
-    const Id acquire_semantics{ConstU32(static_cast<u32>(spv::MemorySemanticsMask::Acquire))};
-    const Id release_semantics{ConstU32(static_cast<u32>(spv::MemorySemanticsMask::Release))};
+    const Id acquire_semantics{ConstU32(static_cast<u32>(spv::MemorySemanticsMask::Acquire |
+                                                         spv::MemorySemanticsMask::UniformMemory))};
+    const Id release_semantics{ConstU32(static_cast<u32>(spv::MemorySemanticsMask::Release |
+                                                         spv::MemorySemanticsMask::UniformMemory))};
 
     const Id cond_mask{OpGroupNonUniformBallot(U32[4], subgroup_scope, is_active)};
     const Id subgroup_count{OpGroupNonUniformBallotBitCount(
@@ -210,8 +233,6 @@ Id EmitContext::DefineOrderedCountFunction() {
     const auto last_subgroup_label{OpLabel()};
     const auto loop_header_label{OpLabel()};
     const auto poll_success_label{OpLabel()};
-    const auto poll_failed_label{OpLabel()};
-    const auto loop_continue_label{OpLabel()};
     const auto end_merge_label{OpLabel()};
 
     const Id last_subgroup_id{OpISub(U32[1], num_subgroups_val, u32_one_value)};
@@ -223,6 +244,8 @@ Id EmitContext::DefineOrderedCountFunction() {
     OpBranchConditional(both, last_subgroup_label, end_merge_label);
 
     AddLabel(last_subgroup_label);
+    const Id last_exclusive_sum{OpLoad(U32[1], subgroup_counts_at_subgroup_id)};
+    const Id block_count{OpIAdd(U32[1], last_exclusive_sum, subgroup_count)};
 
     OpBranch(loop_header_label);
 
@@ -231,20 +254,14 @@ Id EmitContext::DefineOrderedCountFunction() {
     const Id counter_ptr{OpAccessChain(pointer_type, scratch_buffer_id, u32_zero_value,
                                        ConstU32(ScratchBufferOffsets::LastCountedWorkgroup))};
 
-    const auto val{OpAtomicLoad(U32[1], counter_ptr, device_scope, u32_zero_value)};
+    const auto val{OpAtomicLoad(U32[1], counter_ptr, device_scope, acquire_semantics)};
 
     const Id equals_target{OpIEqual(U1[1], val, block_index)};
 
-    OpLoopMerge(poll_success_label, poll_failed_label, spv::LoopControlMask::MaskNone);
-    // OpSelectionMerge(poll_failed_label, spv::SelectionControlMask::MaskNone);
-    OpBranchConditional(equals_target, poll_success_label, poll_failed_label);
-
-    AddLabel(poll_failed_label);
-    OpBranch(loop_header_label);
+    OpLoopMerge(poll_success_label, loop_header_label, spv::LoopControlMask::MaskNone);
+    OpBranchConditional(equals_target, poll_success_label, loop_header_label);
 
     AddLabel(poll_success_label);
-    const Id last_exclusive_sum{OpLoad(U32[1], subgroup_counts_at_subgroup_id)};
-    const Id block_count{OpIAdd(U32[1], last_exclusive_sum, subgroup_count)};
     const Id global_count_ptr{OpAccessChain(pointer_type, scratch_buffer_id, u32_zero_value,
                                             ConstU32(ScratchBufferOffsets::GlobalCount))};
     const Id prev_global_count{

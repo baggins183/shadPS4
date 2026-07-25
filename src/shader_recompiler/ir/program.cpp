@@ -7,7 +7,6 @@
 
 #include <fmt/format.h>
 
-#include "common/config.h"
 #include "common/io_file.h"
 #include "common/path_util.h"
 #include "core/emulator_settings.h"
@@ -20,15 +19,13 @@ namespace Shader::IR {
 void DumpIrProgram(const Program& program, const Info& info, const std::string& ir_filename) {
     using namespace Common::FS;
 
-    if (!Config::dumpShaders()) {
-        return;
-    }
-
     const auto dump_dir = GetUserPath(PathType::ShaderDir) / "dumps";
     if (!std::filesystem::exists(dump_dir)) {
         std::filesystem::create_directories(dump_dir);
     }
-    const auto ir_file = IOFile{dump_dir / ir_filename, FileAccessMode::Write, FileType::TextFile};
+
+    auto ir_path = dump_dir / ir_filename;
+    const auto ir_file = IOFile{ir_path, FileAccessMode::Create, FileType::TextFile};
 
     size_t index{0};
     std::map<const IR::Inst*, size_t> inst_to_index;

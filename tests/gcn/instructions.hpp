@@ -7,12 +7,15 @@
 
 using OpcodeSOP1 = Shader::Gcn::OpcodeSOP1;
 using OpcodeSOP2 = Shader::Gcn::OpcodeSOP2;
+using OpcodeSOPP = Shader::Gcn::OpcodeSOPP;
 using OpcodeSOPK = Shader::Gcn::OpcodeSOPK;
 using OpcodeVOP1 = Shader::Gcn::OpcodeVOP1;
 using OpcodeVOP2 = Shader::Gcn::OpcodeVOP2;
 using OpcodeVOP3 = Shader::Gcn::OpcodeVOP3;
+using OpcodeVOPC = Shader::Gcn::OpcodeVOPC;
 using OpcodeVOP3P = Shader::Gcn::OpcodeVOP3P;
 using OpcodeDS = Shader::Gcn::OpcodeDS;
+using OpcodeMUBUF = Shader::Gcn::OpcodeMUBUF;
 
 enum class VOperand8 : u8 {
     V0 = 0,
@@ -597,6 +600,35 @@ enum class SOperand8 : u16 {
     LiteralConstant = 255
 };
 
+enum class SOperand5 : u8 {
+    S0_S1_S2_S3 = 0,
+    S4_S5_S6_S7 = 1,
+    S8_S9_S10_S11 = 2,
+    S12_S13_S14_S15 = 3,
+    S16_S17_S18_S19 = 4,
+    S20_S21_S22_S23 = 5,
+    S24_S25_S26_S27 = 6,
+    S28_S29_S30_S31 = 7,
+    S32_S33_S34_S35 = 8,
+    S36_S37_S38_S39 = 9,
+    S40_S41_S42_S43 = 10,
+    S44_S45_S46_S47 = 11,
+    S48_S49_S50_S51 = 12,
+    S52_S53_S54_S55 = 13,
+    S56_S57_S58_S59 = 14,
+    S60_S61_S62_S63 = 15,
+    S64_S65_S66_S67 = 16,
+    S68_S69_S70_S71 = 17,
+    S72_S73_S74_S75 = 18,
+    S76_S77_S78_S79 = 19,
+    S80_S81_S82_S83 = 20,
+    S84_S85_S86_S87 = 21,
+    S88_S89_S90_S91 = 22,
+    S92_S93_S94_S95 = 23,
+    S96_S97_S98_S99 = 24,
+    S100_S101_S102_S103 = 25
+};
+
 enum class SOperand9 : u16 {
     S0 = 0,
     S1 = 1,
@@ -1116,6 +1148,28 @@ private:
     static_assert(sizeof(SOP2Internal) == sizeof(u32));
 };
 
+class SOPP {
+public:
+    explicit constexpr SOPP(OpcodeSOPP op, u16 simm16) {
+        i.simm16 = simm16;
+        i.op = std::to_underlying(op);
+        i.encoding = 0b101111111;
+    }
+
+    u32 Get() {
+        return std::bit_cast<u32>(i);
+    }
+
+private:
+    struct SOPPInternal {
+        u32 simm16 : 16;
+        u32 op : 7;
+        u32 encoding : 9;
+    } i;
+
+    static_assert(sizeof(SOPPInternal) == sizeof(u32));
+};
+
 class SOPK {
 public:
     explicit constexpr SOPK(OpcodeSOPK op, SOperand7 sdst, u16 imm) {
@@ -1388,4 +1442,114 @@ private:
     } i;
 
     static_assert(sizeof(DSInternal) == sizeof(u64));
+};
+
+class MUBUF {
+public:
+    explicit constexpr MUBUF(OpcodeMUBUF op, VOperand8 vaddr, VOperand8 vdata, SOperand5 srsrc,
+                             SOperand8 soffset, u16 offset) {
+        i.offset = offset & 0x0fff;
+        i.offen = 0;
+        i.idxen = 0;
+        i.glc = 0;
+        i.addr64 = 0;
+        i.lds = 0;
+        i.reserved0 = 0;
+        i.op = std::to_underlying(op);
+        i.reserved1 = 0;
+        i.encoding = 0b111000;
+        i.vaddr = std::to_underlying(vaddr);
+        i.vdata = std::to_underlying(vdata);
+        i.srsrc = std::to_underlying(srsrc);
+        i.reserved2 = {};
+        i.slc = 0;
+        i.tfe = 0;
+        i.soffset = std::to_underlying(soffset);
+    }
+
+    u64 Get() {
+        return std::bit_cast<u64>(i);
+    }
+
+    MUBUF& SetOffEn() {
+        i.offen = 1;
+        return *this;
+    }
+
+    MUBUF& SetIdxEn() {
+        i.idxen = 1;
+        return *this;
+    }
+
+    MUBUF& SetLds() {
+        i.lds = 1;
+        return *this;
+    }
+
+    MUBUF& SetGlc() {
+        i.glc = 1;
+        return *this;
+    }
+
+    MUBUF& SetAddr64() {
+        i.addr64 = 1;
+        return *this;
+    }
+
+    MUBUF& SetSlc() {
+        i.slc = 1;
+        return *this;
+    }
+
+    MUBUF& SetTfe() {
+        i.tfe = 1;
+        return *this;
+    }
+
+private:
+    struct MUBUFInternal {
+        u64 offset : 12;
+        u64 offen : 1;
+        u64 idxen : 1;
+        u64 glc : 1;
+        u64 addr64 : 1;
+        u64 lds : 1;
+        u64 reserved0 : 1;
+        u64 op : 7;
+        u64 reserved1 : 1;
+        u64 encoding : 6;
+        u64 vaddr : 8;
+        u64 vdata : 8;
+        u64 srsrc : 5;
+        u64 reserved2 : 1;
+        u64 slc : 1;
+        u64 tfe : 1;
+        u64 soffset : 8;
+    } i;
+
+    static_assert(sizeof(MUBUFInternal) == sizeof(u64));
+};
+
+class VOPC {
+public:
+    explicit constexpr VOPC(OpcodeVOPC op, SOperand9 src0, VOperand8 vsrc1) {
+        i.src0 = std::to_underlying(src0);
+        i.vsrc1 = std::to_underlying(vsrc1);
+        i.op = std::to_underlying(op);
+        i.encoding = 0b0111110;
+    }
+
+    u32 Get() {
+        return std::bit_cast<u32>(i);
+    }
+
+private:
+    struct VOPCInternal {
+        u32 src0 : 9;
+        u32 vsrc1 : 8;
+        u32 op : 8;
+        u32 encoding : 7;
+    } i;
+
+    static_assert(sizeof(VOPCInternal) == sizeof(u32));
 };

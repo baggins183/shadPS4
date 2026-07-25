@@ -19,7 +19,6 @@ static const u32 GlobalCount = 2;
 } // namespace ScratchBufferOffsets
 
 namespace SharedMemStructIndices {
-// TODO make these struct members/logical indices
 static const u32 SubgroupCounts = 0;
 static const u32 ScratchVal = 1;
 } // namespace SharedMemStructIndices

@@ -648,22 +648,40 @@ TEST_F(GcnTest, pk_add_f16_op_sel_reversed) {
 }
 
 TEST_F(GcnTest, ds_ordered_count) {
-    auto runner = gcn_test::Runner::instance().value();
+    auto runner = gcn_test::Runner::instance_ordered_count().value();
+
+    static constexpr u32 workgroup_size = 128;
+    static constexpr u32 num_workgroups = 2000000;
+    static constexpr u32 total_num_threads = workgroup_size * num_workgroups;
+
+    printf("workgroup_size : %u\n", workgroup_size);
+    printf("num_workgroups : %u\n", num_workgroups);
 
     const u32 packer_id = 0;
-    auto spirv = TranslateToSpirv(DS(OpcodeDS::DS_ORDERED_COUNT, VOperand8::V0, VOperand8::V1,
-                                     VOperand8::V2, VOperand8::V3, packer_id << 2, 0, true)
-                                      .Get());
+    auto spirv = TranslateToSpirvForOrderedCount(workgroup_size, num_workgroups);
 
     {
-        // TODO delete
         const auto filename = fmt::format("{}.spv", test_info_->test_case_name());
         const auto file = Common::FS::IOFile{filename, Common::FS::FileAccessMode::Create};
         file.WriteSpan(std::span<const u32>(spirv));
     }
 
-    auto result = runner->run<u32>(spirv, std::array{0, 0, 0, 0});
+    std::vector<u32> results;
+
+    auto result =
+        runner->run_raw_ordered_count(spirv, workgroup_size, num_workgroups, packer_id, results);
 
     EXPECT_TRUE(result.has_value());
-    EXPECT_EQ(*result, 0);
+    // EXPECT_EQ(*result, 0);
+
+    // thread active mask (input) for participating in count stored in first half
+    // ordered count return vals stored in 2nd half of buffer
+    u32 count = 0;
+    for (auto i = 0; i < total_num_threads; i++) {
+        EXPECT_EQ(count, results[total_num_threads + i]);
+
+        if (results[i] == 1) {
+            ++count;
+        }
+    }
 }

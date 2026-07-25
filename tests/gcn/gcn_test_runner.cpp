@@ -62,6 +62,22 @@ struct HostBuffer {
     HostBuffer& operator=(const HostBuffer&) = delete;
 };
 
+struct DeviceBuffer {
+    vk::Device device;
+    vk::Buffer buffer;
+    vk::DeviceMemory memory;
+
+    ~DeviceBuffer() {
+        if (buffer)
+            device.destroyBuffer(buffer);
+        if (memory)
+            device.freeMemory(memory);
+    }
+    DeviceBuffer() = default;
+    DeviceBuffer(const DeviceBuffer&) = delete;
+    DeviceBuffer& operator=(const DeviceBuffer&) = delete;
+};
+
 auto create_host_buffer(vk::Device dev, vk::PhysicalDevice pd, vk::DeviceSize size,
                         vk::BufferUsageFlags usage)
     -> std::expected<std::unique_ptr<HostBuffer>, ErrorInfo> {
@@ -103,6 +119,40 @@ auto create_host_buffer(vk::Device dev, vk::PhysicalDevice pd, vk::DeviceSize si
     return buf;
 }
 
+auto create_device_local_buffer(vk::Device dev, vk::PhysicalDevice pd, vk::DeviceSize size,
+                                vk::BufferUsageFlags usage)
+    -> std::expected<std::unique_ptr<DeviceBuffer>, ErrorInfo> {
+    auto buf = std::make_unique<DeviceBuffer>();
+    buf->device = dev;
+
+    auto [br, buffer] = dev.createBuffer(vk::BufferCreateInfo{
+        .size = size,
+        .usage = usage,
+        .sharingMode = vk::SharingMode::eExclusive,
+    });
+    if (br != vk::Result::eSuccess)
+        return make_error(Error::BufferAllocationFailed, "createBuffer");
+    buf->buffer = buffer;
+
+    auto req = dev.getBufferMemoryRequirements(buffer);
+    auto mt = find_memory_type(pd, req.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal);
+    if (!mt)
+        return std::unexpected(mt.error());
+
+    auto [mr, mem] = dev.allocateMemory({
+        .allocationSize = req.size,
+        .memoryTypeIndex = *mt,
+    });
+    if (mr != vk::Result::eSuccess)
+        return make_error(Error::BufferAllocationFailed, "allocateMemory");
+    buf->memory = mem;
+
+    if (dev.bindBufferMemory(buffer, mem, 0) != vk::Result::eSuccess)
+        return make_error(Error::BufferAllocationFailed, "bindBufferMemory");
+
+    return buf;
+}
+
 std::mutex g_runner_mutex;
 std::unique_ptr<Runner> g_runner;
 
@@ -131,6 +181,17 @@ std::expected<Runner*, ErrorInfo> Runner::instance() {
         return g_runner.get();
     auto r = std::unique_ptr<Runner>(new Runner{});
     if (auto init = r->initialize(); !init)
+        return std::unexpected(init.error());
+    g_runner = std::move(r);
+    return g_runner.get();
+}
+
+std::expected<Runner*, ErrorInfo> Runner::instance_ordered_count() {
+    std::lock_guard lock{g_runner_mutex};
+    if (g_runner)
+        return g_runner.get();
+    auto r = std::unique_ptr<Runner>(new Runner{});
+    if (auto init = r->initialize_ordered_count(); !init)
         return std::unexpected(init.error());
     g_runner = std::move(r);
     return g_runner.get();
@@ -176,6 +237,7 @@ std::expected<void, ErrorInfo> Runner::initialize() {
         VK_EXT_SHADER_OBJECT_EXTENSION_NAME,
         VK_KHR_MAINTENANCE_6_EXTENSION_NAME,
         VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
+        VK_KHR_MAINTENANCE_9_EXTENSION_NAME,
     };
 
     for (auto pd : devs) {
@@ -313,6 +375,191 @@ std::expected<void, ErrorInfo> Runner::initialize() {
     return {};
 }
 
+std::expected<void, ErrorInfo> Runner::initialize_ordered_count() {
+    VULKAN_HPP_DEFAULT_DISPATCHER.init();
+
+    // ---- Instance ------------------------------------------------------
+    vk::ApplicationInfo app_info{
+        .pApplicationName = "gcn_test_runner",
+        .applicationVersion = 1,
+        .pEngineName = "gcn_test_runner",
+        .engineVersion = 1,
+        .apiVersion = vk::ApiVersion13,
+    };
+    std::vector<const char*> layers;
+    if (kEnableValidation)
+        layers.push_back("VK_LAYER_KHRONOS_validation");
+
+    auto [ir, inst] = vk::createInstance({
+        .pApplicationInfo = &app_info,
+        .enabledLayerCount = static_cast<std::uint32_t>(layers.size()),
+        .ppEnabledLayerNames = layers.data(),
+    });
+    if (ir != vk::Result::eSuccess)
+        return make_error(Error::InstanceCreationFailed,
+                          std::format("createInstance: {}", vk::to_string(ir)));
+    instance_ = inst;
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(instance_);
+
+    // ---- Pick physical device with the extensions we need -------------
+    auto [pr, devs] = instance_.enumeratePhysicalDevices();
+    if (pr != vk::Result::eSuccess || devs.empty())
+        return make_error(Error::NoSuitableDevice, "no Vulkan devices");
+
+    constexpr std::array required_exts{
+        VK_EXT_SHADER_OBJECT_EXTENSION_NAME,
+        VK_KHR_MAINTENANCE_6_EXTENSION_NAME,
+        VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
+        VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_EXTENSION_NAME,
+        VK_EXT_SHADER_SUBGROUP_BALLOT_EXTENSION_NAME,
+    };
+
+    for (auto pd : devs) {
+        auto [er, exts] = pd.enumerateDeviceExtensionProperties();
+        if (er != vk::Result::eSuccess)
+            continue;
+
+        auto has_ext = [&](const char* name) {
+            return std::ranges::any_of(
+                exts, [&](auto& e) { return std::string_view{e.extensionName} == name; });
+        };
+        if (!std::ranges::all_of(required_exts, has_ext))
+            continue;
+
+        auto families = pd.getQueueFamilyProperties();
+        for (std::uint32_t i = 0; i < families.size(); ++i) {
+            if (families[i].queueFlags & vk::QueueFlagBits::eCompute) {
+                physical_device_ = pd;
+                queue_family_ = i;
+                break;
+            }
+        }
+        if (physical_device_)
+            break;
+    }
+    if (!physical_device_)
+        return make_error(Error::NoSuitableDevice,
+                          "no device with compute + shader_object + maintenance6 + "
+                          "push_descriptor");
+
+    max_push_constant_size_ = sizeof(Shader::PushData);
+    // physical_device_.getProperties().limits.maxPushConstantsSize;
+
+    // ---- Device with feature chain ------------------------------------
+    float priority = 1.0f;
+    vk::DeviceQueueCreateInfo qci{
+        .queueFamilyIndex = queue_family_,
+        .queueCount = 1,
+        .pQueuePriorities = &priority,
+    };
+    vk::PhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR wmel_feat{
+        .workgroupMemoryExplicitLayout = true,
+    };
+    vk::PhysicalDeviceShaderObjectFeaturesEXT so_feat{.pNext = &wmel_feat, .shaderObject = VK_TRUE};
+    vk::PhysicalDeviceMaintenance6FeaturesKHR m6_feat{
+        .pNext = &so_feat,
+        .maintenance6 = VK_TRUE,
+    };
+    vk::PhysicalDeviceVulkan11Features v11_feat{
+        .pNext = &m6_feat,
+        .uniformAndStorageBuffer16BitAccess = VK_TRUE,
+    };
+    vk::PhysicalDeviceVulkan12Features v12_feat{
+        .pNext = &v11_feat,
+        .uniformAndStorageBuffer8BitAccess = VK_TRUE,
+        .shaderFloat16 = VK_TRUE,
+        .shaderInt8 = VK_TRUE,
+    };
+    vk::PhysicalDeviceFeatures phys_feat{
+        .shaderInt64 = VK_TRUE,
+        .shaderInt16 = VK_TRUE,
+    };
+
+    auto [dr, dev] = physical_device_.createDevice({
+        .pNext = &v12_feat,
+        .queueCreateInfoCount = 1,
+        .pQueueCreateInfos = &qci,
+        .enabledExtensionCount = required_exts.size(),
+        .ppEnabledExtensionNames = required_exts.data(),
+        .pEnabledFeatures = &phys_feat,
+    });
+    if (dr != vk::Result::eSuccess)
+        return make_error(Error::DeviceCreationFailed,
+                          std::format("createDevice: {}", vk::to_string(dr)));
+    device_ = dev;
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(device_);
+    queue_ = device_.getQueue(queue_family_, 0);
+
+    // ---- Command pool + cached command buffer -------------------------
+    auto [cpr, pool] = device_.createCommandPool({
+        .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+        .queueFamilyIndex = queue_family_,
+    });
+    if (cpr != vk::Result::eSuccess)
+        return make_error(Error::DeviceCreationFailed, "createCommandPool");
+    command_pool_ = pool;
+
+    auto [cbr, cbs] = device_.allocateCommandBuffers({
+        .commandPool = command_pool_,
+        .level = vk::CommandBufferLevel::ePrimary,
+        .commandBufferCount = 1,
+    });
+    if (cbr != vk::Result::eSuccess)
+        return make_error(Error::DeviceCreationFailed, "allocateCommandBuffers");
+    command_buffer_ = cbs[0];
+
+    // ---- Fence (cached, reset per call) --------------------------------
+    auto [fr, fence] = device_.createFence({});
+    if (fr != vk::Result::eSuccess)
+        return make_error(Error::DeviceCreationFailed, "createFence");
+    fence_ = fence;
+
+    // ---- Descriptor set layout with push-descriptor flag --------------
+    // Single storage buffer at binding 0. No descriptor sets are ever
+    // allocated from this layout — the layout is just used to tell the
+    // pipeline layout and shader what the push-descriptor shape is.
+    std::vector<vk::DescriptorSetLayoutBinding> dsl_bindings{
+        {
+            .binding = 0,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute,
+        },
+        {
+            .binding = 1,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute,
+        },
+    };
+    auto [dslr, dsl] = device_.createDescriptorSetLayout({
+        .flags = vk::DescriptorSetLayoutCreateFlagBits::ePushDescriptorKHR,
+        .bindingCount = static_cast<uint32_t>(dsl_bindings.size()),
+        .pBindings = dsl_bindings.data(),
+    });
+    if (dslr != vk::Result::eSuccess)
+        return make_error(Error::DeviceCreationFailed, "createDescriptorSetLayout");
+    descriptor_set_layout_ = dsl;
+
+    // ---- Pipeline layout sized to device max push constants -----------
+    vk::PushConstantRange pc{
+        .stageFlags = vk::ShaderStageFlagBits::eCompute,
+        .offset = 0,
+        .size = max_push_constant_size_,
+    };
+    auto [plr, pl] = device_.createPipelineLayout({
+        .setLayoutCount = 1,
+        .pSetLayouts = &descriptor_set_layout_,
+        .pushConstantRangeCount = 0,
+        .pPushConstantRanges = nullptr,
+    });
+    if (plr != vk::Result::eSuccess)
+        return make_error(Error::DeviceCreationFailed, "createPipelineLayout");
+    pipeline_layout_ = pl;
+
+    return {};
+}
+
 std::expected<void, ErrorInfo> Runner::run_raw(std::span<const std::uint32_t> spirv,
                                                std::span<const std::byte> push_constants,
                                                std::span<std::byte> output, DispatchSize dispatch) {
@@ -431,6 +678,197 @@ std::expected<void, ErrorInfo> Runner::run_raw(std::span<const std::uint32_t> sp
         return make_error(Error::ExecutionFailed, "waitForFences");
 
     std::memcpy(output.data(), output_buffer->mapped, output.size());
+    return {};
+}
+
+uint wang_hash(uint key) {
+    key = (key ^ 61) ^ (key >> 16);
+    key = key + (key << 3);
+    key = key ^ (key >> 4);
+    key = key * 0x27d4eb2d; // a prime number
+    key = key ^ (key >> 15);
+    return key;
+}
+
+std::expected<void, ErrorInfo> Runner::run_raw_ordered_count(std::span<const std::uint32_t> spirv,
+                                                             u32 workgroup_size_x,
+                                                             u32 num_workgroups_x, u32 packer_id,
+                                                             std::vector<u32>& results) {
+
+    u32 total_num_threads = workgroup_size_x * num_workgroups_x;
+    // buffer serves as inputs and outputs
+    // thread active mask (input) for participating in count stored in first half
+    // ordered count return vals stored in 2nd half of buffer
+    u32 num_results = total_num_threads * 2;
+    u32 result_buffer_size = num_results * 4;
+
+    constexpr u32 scratch_buffer_size = 12; // TODO
+
+    auto buf_r = create_host_buffer(device_, physical_device_, result_buffer_size,
+                                    vk::BufferUsageFlagBits::eStorageBuffer);
+    if (!buf_r)
+        return std::unexpected(buf_r.error());
+
+    auto& result_buffer = *buf_r;
+    std::memset(result_buffer->mapped, 0, result_buffer_size);
+
+    // TODO make device local
+    auto buf_s = create_device_local_buffer(device_, physical_device_, scratch_buffer_size,
+                                            vk::BufferUsageFlagBits::eStorageBuffer |
+                                                vk::BufferUsageFlagBits::eTransferDst);
+    if (!buf_s)
+        return std::unexpected(buf_s.error());
+
+    auto& scratch_buffer = *buf_s;
+
+    for (auto i = 0; i < total_num_threads; i++) {
+        // set active mask
+        // (random)
+        reinterpret_cast<u32*>(result_buffer->mapped)[i] = wang_hash(i) & 1;
+    }
+
+    // Per-call: shader object --------------------------------------------
+    vk::PushConstantRange shader_pc{
+        .stageFlags = vk::ShaderStageFlagBits::eCompute,
+        .offset = 0,
+        // .size = static_cast<std::uint32_t>(push_constants.size()),
+        .size = sizeof(Shader::PushData),
+    };
+    vk::ShaderCreateInfoEXT sci{
+        .stage = vk::ShaderStageFlagBits::eCompute,
+        .codeType = vk::ShaderCodeTypeEXT::eSpirv,
+        .codeSize = spirv.size() * sizeof(std::uint32_t),
+        .pCode = spirv.data(),
+        .pName = "main",
+        .setLayoutCount = 1,
+        .pSetLayouts = &descriptor_set_layout_,
+        .pushConstantRangeCount = 0,
+        .pPushConstantRanges = nullptr,
+    };
+    auto [sr, shaders] = device_.createShadersEXT(sci);
+    if (sr != vk::Result::eSuccess)
+        return make_error(Error::ShaderCreationFailed,
+                          std::format("createShadersEXT: {}", vk::to_string(sr)));
+    auto shader = shaders[0];
+    struct ShaderGuard {
+        vk::Device d;
+        vk::ShaderEXT s;
+        ~ShaderGuard() {
+            if (s)
+                d.destroyShaderEXT(s);
+        }
+    } sg{device_, shader};
+
+    // Reset cached command buffer + fence --------------------------------
+    device_.resetFences(fence_);
+    command_buffer_.reset();
+
+    auto [qs, query_pool] = device_.createQueryPool(vk::QueryPoolCreateInfo{
+        .flags = vk::QueryPoolCreateFlagBits::eResetKHR,
+        .queryType = vk::QueryType::eTimestamp,
+        .queryCount = 2,
+    });
+
+    if (qs != vk::Result::eSuccess) {
+        return make_error(Error::CommandSubmissionFailed, "createQueryPool");
+    }
+
+    if (command_buffer_.begin({
+            .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
+        }) != vk::Result::eSuccess)
+        return make_error(Error::CommandSubmissionFailed, "cmd.begin");
+
+    command_buffer_.fillBuffer(scratch_buffer->buffer, 0, VK_WHOLE_SIZE, 0);
+
+    // Bind shader object -------------------------------------------------
+    vk::ShaderStageFlagBits stage = vk::ShaderStageFlagBits::eCompute;
+    command_buffer_.bindShadersEXT(1, &stage, &shader);
+
+    // Push descriptor: binding 0 = output SSBO ---------------------------
+    vk::DescriptorBufferInfo rbi{
+        .buffer = result_buffer->buffer,
+        .offset = 0,
+        .range = VK_WHOLE_SIZE,
+    };
+
+    vk::DescriptorBufferInfo sbi{
+        .buffer = scratch_buffer->buffer,
+        .offset = 0,
+        .range = VK_WHOLE_SIZE,
+    };
+
+    std::vector<vk::WriteDescriptorSet> writes{
+        {
+            .dstBinding = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .pBufferInfo = &rbi,
+        },
+        {
+            .dstBinding = 1,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .pBufferInfo = &sbi,
+        }};
+    vk::PushDescriptorSetInfoKHR push_desc{
+        .stageFlags = vk::ShaderStageFlagBits::eCompute,
+        .layout = pipeline_layout_,
+        .set = 0,
+        .descriptorWriteCount = static_cast<uint32_t>(writes.size()),
+        .pDescriptorWrites = writes.data(),
+    };
+    command_buffer_.pushDescriptorSet2KHR(push_desc);
+
+    command_buffer_.writeTimestamp(vk::PipelineStageFlagBits::eTopOfPipe, query_pool, 0);
+    command_buffer_.dispatch(num_workgroups_x, 1, 1);
+    command_buffer_.writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe, query_pool, 1);
+
+    vk::MemoryBarrier barrier{
+        .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+        .dstAccessMask = vk::AccessFlagBits::eHostRead,
+    };
+    command_buffer_.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+                                    vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+
+    if (command_buffer_.end() != vk::Result::eSuccess)
+        return make_error(Error::CommandSubmissionFailed, "cmd.end");
+
+    vk::SubmitInfo si{
+        .commandBufferCount = 1,
+        .pCommandBuffers = &command_buffer_,
+    };
+
+#if 0
+    if (queue_.submit(si, fence_) != vk::Result::eSuccess)
+        return make_error(Error::CommandSubmissionFailed, "queue.submit");
+    if (device_.waitForFences(fence_, VK_TRUE, UINT64_MAX) != vk::Result::eSuccess)
+        return make_error(Error::ExecutionFailed, "waitForFences");
+#else
+    if (queue_.submit(si) != vk::Result::eSuccess)
+        return make_error(Error::CommandSubmissionFailed, "queue.submit");
+    if (device_.waitIdle() != vk::Result::eSuccess) {
+        return make_error(Error::CommandSubmissionFailed, "waitIdle");
+    }
+
+    auto q_res = device_.getQueryPoolResults<u64>(query_pool, 0, 2, 2 * sizeof(u64), sizeof(u64),
+                                                  vk::QueryResultFlagBits::e64 |
+                                                      vk::QueryResultFlagBits::eWait);
+    if (!q_res.has_value()) {
+        return make_error(Error::CommandSubmissionFailed, "getQueryPoolResults");
+    }
+    std::vector<u64> queries = *q_res;
+    u64 start = queries[0];
+    u64 end = queries[1];
+
+    float period = physical_device_.getProperties().limits.timestampPeriod;
+    double time = (end - start) * period;
+    double ms = time / 1000000;
+
+    printf("time: %lf\n", ms);
+#endif
+
+    results.resize(num_results);
+    std::memcpy(results.data(), result_buffer->mapped, result_buffer_size);
     return {};
 }
 
