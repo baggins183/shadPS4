@@ -8,7 +8,7 @@ namespace OrderedCount {
 
 // Assume only one counter for now
 // in bytes
-static constexpr u32 ScratchBufferSize = 12;
+static constexpr u32 UtilityBufferSize = 12;
 
 // in dwords
 namespace UtilityBufferOffsets {
