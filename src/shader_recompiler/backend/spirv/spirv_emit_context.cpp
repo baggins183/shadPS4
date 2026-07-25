@@ -834,7 +834,7 @@ void EmitContext::DefineBuffers() {
         } else if (desc.buffer_type == BufferType::FaultBuffer) {
             fault_buffer_index = buffers.size();
         } else if (desc.buffer_type == BufferType::OrderedCountScratch) {
-            ordered_count_scratch_index = buffers.size();
+            ordered_count_utility_buffer_index = buffers.size();
         }
 
         // Define aliases depending on the shader usage.

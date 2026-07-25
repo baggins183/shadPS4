@@ -658,7 +658,9 @@ TEST_F(GcnTest, ds_ordered_count) {
     printf("num_workgroups : %u\n", num_workgroups);
 
     const u32 packer_id = 0;
-    auto spirv = TranslateToSpirvForOrderedCount(workgroup_size, num_workgroups);
+    u32 ordered_count_buffer_size;
+    auto spirv =
+        TranslateToSpirvForOrderedCount(workgroup_size, num_workgroups, ordered_count_buffer_size);
 
     {
         const auto filename = fmt::format("{}.spv", test_info_->test_case_name());
@@ -668,8 +670,8 @@ TEST_F(GcnTest, ds_ordered_count) {
 
     std::vector<u32> results;
 
-    auto result =
-        runner->run_raw_ordered_count(spirv, workgroup_size, num_workgroups, packer_id, results);
+    auto result = runner->run_raw_ordered_count(spirv, workgroup_size, num_workgroups, packer_id,
+                                                ordered_count_buffer_size, results);
 
     EXPECT_TRUE(result.has_value());
     // EXPECT_EQ(*result, 0);

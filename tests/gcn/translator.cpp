@@ -128,7 +128,8 @@ IR::BlockList GenerateBlocks(const IR::AbstractSyntaxList& syntax_list) {
 }
 
 // TODO refactor all this
-std::vector<u32> TranslateToSpirvForOrderedCount(u32 workgroup_size_x, u32 num_workgroups_x) {
+std::vector<u32> TranslateToSpirvForOrderedCount(u32 workgroup_size_x, u32 num_workgroups_x,
+                                                 u32& utility_buffer_size) {
     const u32 packer_id = 0;
     u32 num_threads = workgroup_size_x * num_workgroups_x;
 
@@ -274,6 +275,8 @@ std::vector<u32> TranslateToSpirvForOrderedCount(u32 workgroup_size_x, u32 num_w
     Backend::Bindings bindings{};
 
     const auto spirv = Backend::SPIRV::EmitSPIRV(profile, runtime_info, program, bindings);
+
+    utility_buffer_size = info.OrderedCountScratchBufferSize();
 
     return spirv;
 }

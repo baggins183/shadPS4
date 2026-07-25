@@ -358,7 +358,7 @@ public:
     size_t flatbuf_index{};
     size_t bda_pagetable_index{};
     size_t fault_buffer_index{};
-    size_t ordered_count_scratch_index{};
+    size_t ordered_count_utility_buffer_index{};
     Id physical_pointer_type_u32;
 
     Id sampler_type{};

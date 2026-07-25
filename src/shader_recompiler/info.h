@@ -15,6 +15,7 @@
 #include "shader_recompiler/ir/passes/srt.h"
 #include "shader_recompiler/ir/reg.h"
 #include "shader_recompiler/ir/type.h"
+#include "shader_recompiler/ordered_count.h"
 #include "shader_recompiler/params.h"
 #include "shader_recompiler/resource.h"
 #include "shader_recompiler/runtime_info.h"
@@ -210,6 +211,11 @@ struct Info : InfoPersistent {
 
     bool UsesOrderedCount() const {
         return num_ordered_count_packers > 0;
+    }
+
+    u32 OrderedCountScratchBufferSize() const {
+        // TODO
+        return OrderedCount::ScratchBufferSize;
     }
 
     void Serialize(Serialization::Archive& ar) const;

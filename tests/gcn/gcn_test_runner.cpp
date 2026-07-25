@@ -237,7 +237,6 @@ std::expected<void, ErrorInfo> Runner::initialize() {
         VK_EXT_SHADER_OBJECT_EXTENSION_NAME,
         VK_KHR_MAINTENANCE_6_EXTENSION_NAME,
         VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
-        VK_KHR_MAINTENANCE_9_EXTENSION_NAME,
     };
 
     for (auto pd : devs) {
@@ -412,6 +411,7 @@ std::expected<void, ErrorInfo> Runner::initialize_ordered_count() {
         VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
         VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_EXTENSION_NAME,
         VK_EXT_SHADER_SUBGROUP_BALLOT_EXTENSION_NAME,
+        VK_KHR_MAINTENANCE_9_EXTENSION_NAME,
     };
 
     for (auto pd : devs) {
@@ -693,6 +693,7 @@ uint wang_hash(uint key) {
 std::expected<void, ErrorInfo> Runner::run_raw_ordered_count(std::span<const std::uint32_t> spirv,
                                                              u32 workgroup_size_x,
                                                              u32 num_workgroups_x, u32 packer_id,
+                                                             u32 utility_buffer_size,
                                                              std::vector<u32>& results) {
 
     u32 total_num_threads = workgroup_size_x * num_workgroups_x;
@@ -701,8 +702,6 @@ std::expected<void, ErrorInfo> Runner::run_raw_ordered_count(std::span<const std
     // ordered count return vals stored in 2nd half of buffer
     u32 num_results = total_num_threads * 2;
     u32 result_buffer_size = num_results * 4;
-
-    constexpr u32 scratch_buffer_size = 12; // TODO
 
     auto buf_r = create_host_buffer(device_, physical_device_, result_buffer_size,
                                     vk::BufferUsageFlagBits::eStorageBuffer);
@@ -713,13 +712,13 @@ std::expected<void, ErrorInfo> Runner::run_raw_ordered_count(std::span<const std
     std::memset(result_buffer->mapped, 0, result_buffer_size);
 
     // TODO make device local
-    auto buf_s = create_device_local_buffer(device_, physical_device_, scratch_buffer_size,
+    auto buf_s = create_device_local_buffer(device_, physical_device_, utility_buffer_size,
                                             vk::BufferUsageFlagBits::eStorageBuffer |
                                                 vk::BufferUsageFlagBits::eTransferDst);
     if (!buf_s)
         return std::unexpected(buf_s.error());
 
-    auto& scratch_buffer = *buf_s;
+    auto& utility_buffer = *buf_s;
 
     for (auto i = 0; i < total_num_threads; i++) {
         // set active mask
@@ -778,7 +777,7 @@ std::expected<void, ErrorInfo> Runner::run_raw_ordered_count(std::span<const std
         }) != vk::Result::eSuccess)
         return make_error(Error::CommandSubmissionFailed, "cmd.begin");
 
-    command_buffer_.fillBuffer(scratch_buffer->buffer, 0, VK_WHOLE_SIZE, 0);
+    command_buffer_.fillBuffer(utility_buffer->buffer, 0, VK_WHOLE_SIZE, 0);
 
     // Bind shader object -------------------------------------------------
     vk::ShaderStageFlagBits stage = vk::ShaderStageFlagBits::eCompute;
@@ -792,7 +791,7 @@ std::expected<void, ErrorInfo> Runner::run_raw_ordered_count(std::span<const std
     };
 
     vk::DescriptorBufferInfo sbi{
-        .buffer = scratch_buffer->buffer,
+        .buffer = utility_buffer->buffer,
         .offset = 0,
         .range = VK_WHOLE_SIZE,
     };

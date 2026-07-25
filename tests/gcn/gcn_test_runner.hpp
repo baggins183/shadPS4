@@ -52,7 +52,8 @@ public:
 
     std::expected<void, ErrorInfo> run_raw_ordered_count(std::span<const std::uint32_t> spirv,
                                                          u32 workgroup_size_x, u32 num_workgroups_x,
-                                                         u32 packer_id, std::vector<u32>& output);
+                                                         u32 packer_id, u32 utility_buffer_size,
+                                                         std::vector<u32>& output);
 
     template <typename OutputT, typename PushT>
     std::expected<OutputT, ErrorInfo> run(std::span<const std::uint32_t> spirv, const PushT& push,
