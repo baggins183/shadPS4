@@ -218,6 +218,10 @@ struct Info : InfoPersistent {
         return OrderedCount::ScratchBufferSize;
     }
 
+    bool UsesSharedMemoryBlocks() const {
+        return std::popcount(static_cast<u32>(shared_types)) > 1 || UsesOrderedCount();
+    }
+
     void Serialize(Serialization::Archive& ar) const;
     bool Deserialize(Serialization::Archive& ar);
 };
