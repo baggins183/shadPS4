@@ -276,7 +276,7 @@ std::vector<u32> TranslateToSpirvForOrderedCount(u32 workgroup_size_x, u32 num_w
 
     const auto spirv = Backend::SPIRV::EmitSPIRV(profile, runtime_info, program, bindings);
 
-    utility_buffer_size = info.OrderedCountScratchBufferSize();
+    utility_buffer_size = info.OrderedCountUtilityBufferSize();
 
     return spirv;
 }
