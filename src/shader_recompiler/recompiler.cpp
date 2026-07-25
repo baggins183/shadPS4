@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: Copyright 2024 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-#include "common/config.h"
 #include "common/io_file.h"
 #include "common/path_util.h"
 #include "shader_recompiler/frontend/control_flow_graph.h"
@@ -56,14 +55,6 @@ IR::Program TranslateProgram(const std::span<const u32>& code, Pools& pools, Inf
     Common::ObjectPool<Gcn::Block> gcn_block_pool{64};
     Gcn::CFG cfg{gcn_block_pool, program.ins_list};
 
-    auto dump_ir = [&](std::string phase) {
-        const auto ir_filename =
-            fmt::format("{}_{:#018x}.{}.ir.txt", info.stage, info.pgm_hash, phase);
-        if (Config::dumpShaders()) {
-            IR::DumpIrProgram(program, info, ir_filename);
-        }
-    };
-
     // Structurize control flow graph and create program.
     program.syntax_list =
         Shader::Gcn::BuildASL(pools.inst_pool, pools.block_pool, cfg, info, runtime_info, profile);
@@ -78,9 +69,7 @@ IR::Program TranslateProgram(const std::span<const u32>& code, Pools& pools, Inf
     if (!profile.support_float64) {
         Shader::Optimization::LowerFp64ToFp32(program);
     }
-    dump_ir("pre_ssa");
     Shader::Optimization::SsaRewritePass(program.post_order_blocks);
-    dump_ir("post_ssa");
     Shader::Optimization::ConstantPropagationPass(program.post_order_blocks);
     Shader::Optimization::IdentityRemovalPass(program.blocks);
     if (info.l_stage == LogicalStage::TessellationControl) {

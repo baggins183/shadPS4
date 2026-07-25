@@ -337,10 +337,10 @@ void Translator::DS_CONSUME(const GcnInst& inst) {
 }
 
 void Translator::DS_ORDERED_COUNT(const GcnInst& inst) {
-    // TODO?
     ASSERT_MSG(info.l_stage == LogicalStage::Compute, "Only supported in compute");
     const u32 packer_id = inst.control.ds.offset0 >> 2;
-    SetDst(inst.dst[0], ir.OrderedCount(ir.Imm32(packer_id), ir.Imm1(true) /*TODO fix is_active*/));
+    const IR::U1 is_active = ir.GetExec();
+    SetDst(inst.dst[0], ir.OrderedCount(ir.Imm32(packer_id), is_active));
 }
 
 } // namespace Shader::Gcn

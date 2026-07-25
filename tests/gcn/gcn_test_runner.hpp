@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "common/types.h"
 #define VULKAN_HPP_NO_EXCEPTIONS
 #define VULKAN_HPP_NO_CONSTRUCTORS
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
@@ -42,47 +43,39 @@ struct ErrorInfo {
 class Runner {
 public:
     static std::expected<Runner*, ErrorInfo> instance();
+    static std::expected<Runner*, ErrorInfo> instance_ordered_count();
     static void DestroyInstance();
 
-    std::expected<void, ErrorInfo> run_raw(
-        std::span<const std::uint32_t> spirv,
-        std::span<const std::byte> push_constants,
-        std::span<std::byte> output,
-        DispatchSize dispatch = {}
-    );
+    std::expected<void, ErrorInfo> run_raw(std::span<const std::uint32_t> spirv,
+                                           std::span<const std::byte> push_constants,
+                                           std::span<std::byte> output, DispatchSize dispatch = {});
+
+    std::expected<void, ErrorInfo> run_raw_ordered_count(std::span<const std::uint32_t> spirv,
+                                                         u32 workgroup_size_x, u32 num_workgroups_x,
+                                                         u32 packer_id, std::vector<u32>& output);
 
     template <typename OutputT, typename PushT>
-    std::expected<OutputT, ErrorInfo> run(
-        std::span<const std::uint32_t> spirv,
-        const PushT& push,
-        DispatchSize dispatch = {}
-    ) {
+    std::expected<OutputT, ErrorInfo> run(std::span<const std::uint32_t> spirv, const PushT& push,
+                                          DispatchSize dispatch = {}) {
         static_assert(std::is_trivially_copyable_v<PushT>);
         static_assert(std::is_trivially_copyable_v<OutputT>);
         OutputT result{};
-        auto r = run_raw(
-            spirv,
-            {reinterpret_cast<const std::byte*>(&push), sizeof(PushT)},
-            {reinterpret_cast<std::byte*>(&result), sizeof(OutputT)},
-            dispatch
-        );
-        if (!r) return std::unexpected(r.error());
+        auto r = run_raw(spirv, {reinterpret_cast<const std::byte*>(&push), sizeof(PushT)},
+                         {reinterpret_cast<std::byte*>(&result), sizeof(OutputT)}, dispatch);
+        if (!r)
+            return std::unexpected(r.error());
         return result;
     }
 
     template <typename OutputT>
-    std::expected<OutputT, ErrorInfo> run(
-        std::span<const std::uint32_t> spirv,
-        DispatchSize dispatch = {}
-    ) {
+    std::expected<OutputT, ErrorInfo> run(std::span<const std::uint32_t> spirv,
+                                          DispatchSize dispatch = {}) {
         static_assert(std::is_trivially_copyable_v<OutputT>);
         OutputT result{};
-        auto r = run_raw(
-            spirv, {},
-            {reinterpret_cast<std::byte*>(&result), sizeof(OutputT)},
-            dispatch
-        );
-        if (!r) return std::unexpected(r.error());
+        auto r =
+            run_raw(spirv, {}, {reinterpret_cast<std::byte*>(&result), sizeof(OutputT)}, dispatch);
+        if (!r)
+            return std::unexpected(r.error());
         return result;
     }
 
@@ -93,17 +86,18 @@ public:
 private:
     Runner() = default;
     std::expected<void, ErrorInfo> initialize();
+    std::expected<void, ErrorInfo> initialize_ordered_count();
 
-    vk::Instance            instance_;
-    vk::PhysicalDevice      physical_device_;
-    vk::Device              device_;
-    vk::Queue               queue_;
-    std::uint32_t           queue_family_ = 0;
-    vk::CommandPool         command_pool_;
-    vk::CommandBuffer       command_buffer_;        // cached, reset per call
-    vk::Fence               fence_;                 // cached, reset per call
+    vk::Instance instance_;
+    vk::PhysicalDevice physical_device_;
+    vk::Device device_;
+    vk::Queue queue_;
+    std::uint32_t queue_family_ = 0;
+    vk::CommandPool command_pool_;
+    vk::CommandBuffer command_buffer_;              // cached, reset per call
+    vk::Fence fence_;                               // cached, reset per call
     vk::DescriptorSetLayout descriptor_set_layout_; // push-descriptor
-    vk::PipelineLayout      pipeline_layout_;
+    vk::PipelineLayout pipeline_layout_;
 
     std::uint32_t max_push_constant_size_ = 128;
 };

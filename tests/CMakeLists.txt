@@ -132,6 +132,9 @@ set(GCN_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/video_core/amdgpu/pixel_format.cpp
     ${CMAKE_SOURCE_DIR}/src/video_core/amdgpu/pixel_format.h
     ${CMAKE_SOURCE_DIR}/src/video_core/amdgpu/resource.h
+    ${CMAKE_SOURCE_DIR}/src/shader_recompiler/frontend/structured_control_flow.cpp
+    ${CMAKE_SOURCE_DIR}/src/shader_recompiler/frontend/control_flow_graph.cpp
+    ${CMAKE_SOURCE_DIR}/src/shader_recompiler/frontend/instruction.cpp
 
     # Minimal common support
     ${CMAKE_SOURCE_DIR}/src/common/path_util.cpp
