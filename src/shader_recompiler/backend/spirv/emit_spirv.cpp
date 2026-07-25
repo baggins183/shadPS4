@@ -342,6 +342,7 @@ void SetupCapabilities(const Info& info, const Profile& profile, const RuntimeIn
     }
     const auto shared_type_count = std::popcount(static_cast<u32>(info.shared_types));
     if (shared_type_count > 1 && profile.supports_workgroup_explicit_memory_layout) {
+        // TODO refactor
         ctx.AddExtension("SPV_KHR_workgroup_memory_explicit_layout");
         ctx.AddCapability(spv::Capability::WorkgroupMemoryExplicitLayoutKHR);
         ctx.AddCapability(spv::Capability::WorkgroupMemoryExplicitLayout16BitAccessKHR);
@@ -361,7 +362,6 @@ void SetupCapabilities(const Info& info, const Profile& profile, const RuntimeIn
     }
     if (info.UsesOrderedCount()) {
         ctx.AddExtension("SPV_KHR_workgroup_memory_explicit_layout");
-        ctx.AddExtension("SPV_KHR_shader_ballot");
         ctx.AddCapability(spv::Capability::WorkgroupMemoryExplicitLayoutKHR);
         ctx.AddCapability(spv::Capability::GroupNonUniform);
         ctx.AddCapability(spv::Capability::GroupNonUniformBallot);
