@@ -811,6 +811,7 @@ EmitContext::BufferSpv EmitContext::DefineBuffer(bool is_storage, bool is_writte
         Name(id, "ssbo_shmem");
         break;
     case BufferType::OrderedCountUtility:
+        ordered_count_utility_buffer_binding = binding.unified;
         Name(id, "ordered_count_utility");
         break;
     default:
@@ -1086,39 +1087,8 @@ void EmitContext::DefineSharedMemory() {
 
     // For now, only one scenario where we need scratch memory (shader has DS_ORDERED_COUNT)
     if (info.UsesOrderedCount()) {
-        const u32 shared_mem_ordered_count_base =
-            Common::AlignUp(shared_mem_total_size, 32 /*TODO*/);
-
-        const auto& threadgroup_dims = runtime_info.cs_info.workgroup_size;
-        const u32 threadgroup_size =
-            threadgroup_dims[0] * threadgroup_dims[1] * threadgroup_dims[2];
-        // TODO: this is potentially innacurate, may need to be conservative or mess with
-        // VK_EXT_subgroup_size_control
-        max_num_subgroups = Common::DivCeil(threadgroup_size, profile.subgroup_size);
-
+        shared_mem_ordered_count_base = Common::AlignUp(shared_mem_total_size, 32 /*TODO*/);
         u32 shared_mem_ordered_count_size = 4 * max_num_subgroups + 4;
-
-        ordered_count_subgroup_counts_array_type = TypeArray(U32[1], ConstU32(max_num_subgroups));
-        Decorate(ordered_count_subgroup_counts_array_type, spv::Decoration::ArrayStride, 4);
-
-        const Id struct_type{
-            TypeStruct(ordered_count_subgroup_counts_array_type, /*scratch*/ U32[1])};
-        Decorate(struct_type, spv::Decoration::Block);
-        MemberName(struct_type, 0, "subgroup_counts");
-        MemberDecorate(struct_type, 0u, spv::Decoration::Offset, shared_mem_ordered_count_base);
-        MemberName(struct_type, 1, "scratch_val");
-        MemberDecorate(struct_type, 1u, spv::Decoration::Offset,
-                       shared_mem_ordered_count_base + 4 * max_num_subgroups);
-
-        const Id pointer = TypePointer(spv::StorageClass::Workgroup, struct_type);
-        ordered_count_shared_mem_variable =
-            AddGlobalVariable(pointer, spv::StorageClass::Workgroup);
-        if (num_types > 1) {
-            Decorate(ordered_count_shared_mem_variable, spv::Decoration::Aliased);
-        }
-        Name(ordered_count_shared_mem_variable, "shared_mem_ordered_count");
-        interfaces.push_back(ordered_count_shared_mem_variable);
-
         shared_mem_total_size = shared_mem_ordered_count_base + shared_mem_ordered_count_size;
     }
 
@@ -1330,7 +1300,16 @@ void EmitContext::DefineFunctions() {
         read_const_dynamic = DefineReadConst(true);
     }
     if (info.UsesOrderedCount()) {
-        ordered_count_function = DefineOrderedCountFunction();
+        DefineOrderedCountFunctions();
+    }
+}
+
+void EmitContext::InsertMainFunctionOpVariables() {
+    if (info.UsesOrderedCount()) {
+        ordered_count_function_arg_vars[0] = DefineVar<false>(U32[1], spv::StorageClass::Function);
+        ordered_count_function_arg_vars[1] = DefineVar<false>(U32[1], spv::StorageClass::Function);
+        ordered_count_function_arg_vars[2] = DefineVar<false>(U32[1], spv::StorageClass::Function);
+        ordered_count_function_arg_vars[3] = DefineVar<false>(U1[1], spv::StorageClass::Function);
     }
 }
 

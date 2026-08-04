@@ -11,6 +11,7 @@
 #include "shader_recompiler/ir/condition.h"
 #include "shader_recompiler/ir/patch.h"
 #include "shader_recompiler/ir/value.h"
+#include "shader_recompiler/ordered_count.h"
 
 namespace Shader::IR {
 
@@ -175,7 +176,8 @@ public:
 
     [[nodiscard]] U32 DataAppend(const U32& counter);
     [[nodiscard]] U32 DataConsume(const U32& counter);
-    [[nodiscard]] U32 OrderedCount(const U32& packer_id, const U1& is_active);
+    [[nodiscard]] U32 OrderedCount(const U32& packer_id, const U32& value, const U1& is_active,
+                                   OrderedCount::Flags flags);
     [[nodiscard]] U32 LaneId();
     [[nodiscard]] U32 WarpId();
     [[nodiscard]] U32 QuadShuffle(const U32& value, const U32& index);

@@ -162,9 +162,9 @@ bool PipelineCache::LoadComputePipeline(Serialization::Archive& ar) {
     const auto [it, is_new] = compute_pipelines.try_emplace(compute_key);
     ASSERT(is_new);
 
-    it.value() =
-        std::make_unique<ComputePipeline>(instance, scheduler, desc_heap, profile, *pipeline_cache,
-                                          compute_key, *infos[0], modules[0], sdata, true);
+    it.value() = std::make_unique<ComputePipeline>(
+        instance, scheduler, desc_heap, profile, *pipeline_cache, compute_key, *infos[0],
+        runtime_infos[u32(Shader::LogicalStage::Compute)], modules[0], sdata, true);
 
     infos.fill(nullptr);
     modules.fill(nullptr);

@@ -338,9 +338,16 @@ void Translator::DS_CONSUME(const GcnInst& inst) {
 
 void Translator::DS_ORDERED_COUNT(const GcnInst& inst) {
     ASSERT_MSG(info.l_stage == LogicalStage::Compute, "Only supported in compute");
+    const IR::U32 value{GetSrc(inst.src[0])};
     const u32 packer_id = inst.control.ds.offset0 >> 2;
+    const u32 offset = (inst.control.ds.offset1 << 8) | inst.control.ds.offset0;
+    OrderedCount::Flags flags{.raw = offset};
+
     const IR::U1 is_active = ir.GetExec();
-    SetDst(inst.dst[0], ir.OrderedCount(ir.Imm32(packer_id), is_active));
+    const IR::U32 ordered_count_result =
+        ir.OrderedCount(ir.Imm32(packer_id), value, is_active, flags);
+    const IR::U32 result_broadcast = ir.ReadFirstLane(ordered_count_result);
+    SetDst(inst.dst[0], result_broadcast);
 }
 
 } // namespace Shader::Gcn

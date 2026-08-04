@@ -7,6 +7,7 @@
 #include <vector>
 #include <magic_enum/magic_enum.hpp>
 
+#include <spirv_reflect.h>
 #include "common/assert.h"
 #include "common/func_traits.h"
 #include "shader_recompiler/backend/spirv/emit_spirv.h"
@@ -16,6 +17,11 @@
 #include "shader_recompiler/ir/basic_block.h"
 #include "shader_recompiler/ir/program.h"
 #include "shader_recompiler/runtime_info.h"
+
+#include "ordered_count_spv_lib_comp.h"
+#include "shader_recompiler/backend/spirv/linker_modules/common/ordered_count.h"
+#include "spirv-tools/linker.hpp"
+#include "spirv_reflect.h"
 
 namespace Shader::Backend::SPIRV {
 namespace {
@@ -143,6 +149,7 @@ Id TypeId(const EmitContext& ctx, IR::Type type) {
 
 void Traverse(EmitContext& ctx, const IR::Program& program) {
     IR::Block* current_block{};
+    bool is_first{true};
     for (const IR::AbstractSyntaxNode& node : program.syntax_list) {
         switch (node.type) {
         case IR::AbstractSyntaxNode::Type::Block: {
@@ -152,6 +159,10 @@ void Traverse(EmitContext& ctx, const IR::Program& program) {
             }
             current_block = node.data.block;
             ctx.AddLabel(label);
+            if (is_first) {
+                ctx.InsertMainFunctionOpVariables();
+                is_first = false;
+            }
             for (IR::Inst& inst : node.data.block->Instructions()) {
                 EmitInst(ctx, &inst);
             }
@@ -208,6 +219,7 @@ void Traverse(EmitContext& ctx, const IR::Program& program) {
 Id DefineMain(EmitContext& ctx, const IR::Program& program) {
     const Id void_function{ctx.TypeFunction(ctx.void_id)};
     const Id main{ctx.OpFunction(ctx.void_id, spv::FunctionControlMask::MaskNone, void_function)};
+    // Define function variables
     for (IR::Block* const block : program.blocks) {
         block->SetDefinition(ctx.OpLabel());
     }
@@ -366,6 +378,7 @@ void SetupCapabilities(const Info& info, const Profile& profile, const RuntimeIn
         ctx.AddCapability(spv::Capability::GroupNonUniform);
         ctx.AddCapability(spv::Capability::GroupNonUniformBallot);
         ctx.AddCapability(spv::Capability::GroupNonUniformArithmetic);
+        ctx.AddCapability(spv::Capability::Linkage);
     }
 }
 
@@ -635,6 +648,117 @@ void PatchPhiNodes(const IR::Program& program, EmitContext& ctx) {
         return std::make_pair(arg, parent);
     });
 }
+
+std::vector<u32> PatchOrderedCountSPIRV(EmitContext& ctx, const Profile& profile,
+                                        const RuntimeInfo& runtime_info, const IR::Program& program,
+                                        std::vector<u32>& spirv) {
+
+    SpvReflectShaderModule module{};
+    SpvReflectResult result =
+        spvReflectCreateShaderModule(spirv.size() * sizeof(u32), spirv.data(), &module);
+    assert(result == SPV_REFLECT_RESULT_SUCCESS);
+
+    // patch placeholder binding numbers used in the library
+    const SpvReflectDescriptorBinding* binding =
+        spvReflectGetDescriptorBinding(&module, ORDERED_COUNT_UTILITY_BUFFER_BINDING, 0, &result);
+    ASSERT(result == SPV_REFLECT_RESULT_SUCCESS);
+
+    result = spvReflectChangeDescriptorBindingNumbers(&module, binding,
+                                                      ctx.ordered_count_utility_buffer_binding, 0);
+    ASSERT(result == SPV_REFLECT_RESULT_SUCCESS);
+
+    // Patch shared mem block by adding base offset to all top-level members
+    const u32 shared_block_base_offset = ctx.shared_mem_ordered_count_base;
+    u32 num_shared_blocks;
+    spvReflectEnumerateWorkgroupMemoryBlocks(&module, &num_shared_blocks, NULL);
+    ASSERT(num_shared_blocks == 1);
+    SpvReflectBlockVariable* shared_block;
+    spvReflectEnumerateWorkgroupMemoryBlocks(&module, &num_shared_blocks, &shared_block);
+
+    result =
+        spvReflectAddBaseOffsetToBlockVariable(&module, shared_block, shared_block_base_offset);
+    ASSERT(result == SPV_REFLECT_RESULT_SUCCESS);
+
+    // replace with patched code
+    const u32* code_ptr = spvReflectGetCode(&module);
+    size_t new_size = spvReflectGetCodeSize(&module) / 4;
+
+    // TODO spec const for max_num_subgroups
+
+    std::vector<u32> new_code(code_ptr, code_ptr + new_size);
+
+    spvReflectDestroyShaderModule(&module);
+
+    return new_code;
+}
+
+std::vector<u32> LinkSPIRV(EmitContext& ctx, const Profile& profile,
+                           const RuntimeInfo& runtime_info, const IR::Program& program,
+                           std::vector<u32>& main_module) {
+    Info& info = program.info;
+
+    u32 num_modules = 1;
+    if (info.UsesOrderedCount()) {
+        ++num_modules;
+    }
+
+    if (num_modules > 1) {
+        spvtools::Context link_context(spv_target_env::SPV_ENV_VULKAN_1_4);
+        spvtools::SpirvTools spirv_tools(spv_target_env::SPV_ENV_UNIVERSAL_1_6);
+        // spvtools::SpirvTools spirv_tools(spv_target_env::SPV_ENV_VULKAN_1_4);
+
+        std::vector<const char*> messages;
+        auto messageConsumer = [&messages](spv_message_level_t /* level */,
+                                           const char* /* source */,
+                                           const spv_position_t& /* position */,
+                                           const char* message) { // messages.push_back(message);
+            printf("%s\n", message);
+        };
+
+        spirv_tools.SetMessageConsumer(messageConsumer);
+        link_context.SetMessageConsumer(messageConsumer);
+
+        spirv_tools.Validate(main_module);
+
+        std::vector<const u32*> all_spirv;
+        std::vector<size_t> sizes;
+
+        all_spirv.push_back(main_module.data());
+        sizes.push_back(main_module.size());
+
+        std::vector<u32> ordered_count_spirv;
+
+        if (info.UsesOrderedCount()) {
+            ordered_count_spirv =
+                std::vector<u32>(ordered_count_spv_lib_comp_data,
+                                 ordered_count_spv_lib_comp_data + ordered_count_spv_lib_comp_size);
+
+            spirv_tools.Validate(ordered_count_spirv);
+
+            ordered_count_spirv =
+                PatchOrderedCountSPIRV(ctx, profile, runtime_info, program, ordered_count_spirv);
+
+            spirv_tools.Validate(main_module);
+
+            all_spirv.push_back(ordered_count_spirv.data());
+            sizes.push_back(ordered_count_spirv.size());
+        }
+
+        spvtools::LinkerOptions spv_link_options;
+        spv_link_options.SetVerifyIds(true);
+        spv_link_options.SetCreateLibrary(false);
+
+        std::vector<u32> final_module;
+
+        spv_result_t result = spvtools::Link(link_context, all_spirv.data(), sizes.data(),
+                                             all_spirv.size(), &final_module, spv_link_options);
+        ASSERT(result == SPV_SUCCESS);
+        return final_module;
+    } else {
+        return main_module;
+    }
+}
+
 } // Anonymous namespace
 
 std::vector<u32> EmitSPIRV(const Profile& profile, const RuntimeInfo& runtime_info,
@@ -646,7 +770,8 @@ std::vector<u32> EmitSPIRV(const Profile& profile, const RuntimeInfo& runtime_in
     SetupFloatMode(ctx, profile, runtime_info, main);
     PatchPhiNodes(program, ctx);
     binding.user_data += program.info.ud_mask.NumRegs();
-    return ctx.Assemble();
+    std::vector<u32> main_module = ctx.Assemble();
+    return LinkSPIRV(ctx, profile, runtime_info, program, main_module);
 }
 
 Id EmitPhi(EmitContext& ctx, IR::Inst* inst) {

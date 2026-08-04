@@ -1,0 +1,211 @@
+// SPDX-FileCopyrightText: Copyright 2026 shadPS4 Emulator Project
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+#version 460
+
+#extension GL_EXT_shared_memory_block : require
+#extension GL_KHR_shader_subgroup_basic : require
+#extension GL_KHR_shader_subgroup_ballot : require
+#extension GL_KHR_shader_subgroup_arithmetic : require
+#extension GL_KHR_memory_scope_semantics : require
+#extension GL_GOOGLE_include_directive : require
+
+#include "common/ordered_count.h"
+
+#if 1
+#extension GL_EXT_buffer_reference : require
+
+layout (buffer_reference) buffer BufferRef {
+    uint a;
+};
+
+void dummy (BufferRef ref) {
+    ref.a = 5;
+}
+#endif
+
+layout(constant_id = MAX_NUM_SUBGROUPS_SPEC_ID) const int max_num_sugroups = 1;
+
+layout(std430) shared shared_mem_ordered_count
+{
+    uint scratch_val;
+    // place last so we can actually specialze the length and maintain proper offsets
+    uint subgroup_counts[max_num_sugroups];
+};
+
+layout(set = 0, binding = ORDERED_COUNT_UTILITY_BUFFER_BINDING, std430) buffer ordered_count_utility
+{
+    uint emulated_block_id_assignment;
+    uint next_block_owner_id;
+    uint global_count;
+};
+
+// Grab a workgroup index by bumping a counter "next_emulated_workgroup_index"
+// used by all dispatched workgroups.
+// This is to guarantee forward progress in a shader that uses DS_ORDERED_COUNT,
+// because workgroups aren't dispatched in particular order according to the actual
+// gl_WorkgroupId, but each workgroup must wait for all lower-numbered ones to be counted.
+// This may not be enough in theory if workgroups can be unscheduled, blocking on
+// progress of others, after they've started executing.
+uint init_emulated_workgroup_index() {
+    if (gl_LocalInvocationIndex == 0) {
+        scratch_val = atomicAdd(emulated_block_id_assignment, 1);
+    }
+    barrier();
+    return scratch_val;
+}
+
+uint ordered_count(uint block_index, uint packer_id, bool is_active)
+{
+    uvec4 cond_mask = subgroupBallot(is_active);
+    uint subgroup_count = subgroupBallotBitCount(cond_mask);
+    const uint my_count_offset = subgroupBallotExclusiveBitCount(cond_mask);
+
+    subgroup_counts[gl_SubgroupID] = subgroup_count;
+    barrier();
+
+    if (gl_SubgroupID == 0u) {
+        const uint my_count = gl_LocalInvocationIndex < gl_NumSubgroups ?
+                subgroup_counts[gl_LocalInvocationIndex] :
+                0;
+
+        uint my_scan = subgroupExclusiveAdd(my_count);
+
+        if (gl_LocalInvocationIndex < gl_NumSubgroups)
+        {
+            subgroup_counts[gl_LocalInvocationIndex] = my_scan;
+        }
+    }
+
+    barrier();
+
+    if ((gl_SubgroupID == (gl_NumSubgroups - 1u)) && (gl_SubgroupInvocationID == 0u))
+    {
+        uint block_count = subgroup_count + subgroup_counts[gl_SubgroupID];
+
+        for (;;)
+        {
+            uint val = atomicLoad(next_block_owner_id, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
+            if (val == block_index) {
+                break;
+            }
+        }
+
+        uint prev_count = atomicAdd(global_count, block_count);
+        atomicStore(next_block_owner_id, block_index + 1, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
+        scratch_val = prev_count;
+    }
+
+    barrier();
+
+    return scratch_val + subgroup_counts[gl_SubgroupID] + my_count_offset;
+}
+
+uint ordered_count_per_wave(uint block_index, uint packer_id, uint value, bool is_active)
+{
+    uvec4 cond_mask = subgroupBallot(is_active);
+    //uint subgroup_count = subgroupBallotBitCount(cond_mask);
+    uint subgroup_count = value;
+
+    const uint my_count_offset = subgroupBallotExclusiveBitCount(cond_mask);
+
+    uint target_index = block_index * gl_NumSubgroups + gl_SubgroupID;
+    uint prev_count;
+
+    if (gl_SubgroupInvocationID == 0) {
+        for (;;)
+        {
+            uint val = atomicLoad(next_block_owner_id, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
+            if (val == target_index) {
+                break;
+            }
+        }
+
+        prev_count = atomicAdd(global_count, subgroup_count);
+        atomicStore(next_block_owner_id, target_index + 1, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
+    }
+
+    subgroupBarrier();
+    prev_count = subgroupBroadcast(prev_count, 0);
+
+    //return prev_count + my_count_offset;
+    return prev_count;
+}
+
+uint ordered_count_swap_per_wave(uint block_index, uint packer_id, uint value, bool is_active)
+{
+    uvec4 cond_mask = subgroupBallot(is_active);
+    //uint subgroup_count = subgroupBallotBitCount(cond_mask);
+    uint subgroup_count = value;
+
+    const uint my_count_offset = subgroupBallotExclusiveBitCount(cond_mask);
+
+    uint target_index = block_index * gl_NumSubgroups + gl_SubgroupID;
+    uint prev_count;
+
+    if (gl_SubgroupInvocationID == 0) {
+        for (;;)
+        {
+            uint val = atomicLoad(next_block_owner_id, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
+            if (val == target_index) {
+                break;
+            }
+        }
+
+        prev_count = atomicExchange(global_count, subgroup_count);
+        atomicStore(next_block_owner_id, target_index + 1, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
+    }
+
+    subgroupBarrier();
+    prev_count = subgroupBroadcast(prev_count, 0);
+
+    //return prev_count + my_count_offset;
+    return prev_count;
+}
+
+uint get_target_index(uint block_index) {
+    uint wg_size = gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z;
+    uint wave_id = gl_LocalInvocationIndex / 64;
+    uint num_waves = (wg_size + 63) / 64;
+
+    return block_index * num_waves + wave_id;
+}
+
+// assume only one thread was already elected
+uint ordered_count_one_thread(uint block_index, uint packer_id, uint value, bool is_active)
+{
+    uint target_index = get_target_index(block_index);
+    uint prev_count;
+
+    for (;;)
+    {
+        uint val = atomicLoad(next_block_owner_id, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
+        if (val == target_index) {
+            break;
+        }
+    }
+
+    prev_count = atomicAdd(global_count, value);
+    atomicStore(next_block_owner_id, target_index + 1, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
+
+    return prev_count;
+}
+
+uint ordered_count_swap_one_thread(uint block_index, uint packer_id, uint value, bool is_active)
+{
+    uint target_index = get_target_index(block_index);
+    uint prev_count;
+
+    for (;;)
+    {
+        uint val = atomicLoad(next_block_owner_id, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
+        if (val == target_index) {
+            break;
+        }
+    }
+
+    prev_count = atomicExchange(global_count, value);
+    atomicStore(next_block_owner_id, target_index + 1, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
+
+    return prev_count;
+}

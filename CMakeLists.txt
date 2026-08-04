@@ -238,7 +238,7 @@ if (ENABLE_SYSTEM_LIBRARIES)
     find_package(FFmpeg 5.1.2 MODULE)
     find_package(fmt 12.0.0 CONFIG)
     find_package(Freetype 2.14.1 MODULE)
-    find_package(glslang 15 CONFIG)
+    #find_package(glslang 15 CONFIG) # TODO fixing glslang bugs
     find_package(half 1.12.0 MODULE)
     find_package(magic_enum 0.9.7 CONFIG)
     find_package(miniupnpc 2.3.3 MODULE)
@@ -1387,7 +1387,10 @@ set(HOST_SHADERS_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/src/video_core/host_shaders
 add_subdirectory(${HOST_SHADERS_INCLUDE})
 add_dependencies(shadps4 host_shaders)
 target_include_directories(shadps4 PRIVATE ${HOST_SHADERS_INCLUDE})
-
+    
+add_subdirectory(src/shader_recompiler/backend/spirv/linker_modules)
+add_dependencies(shadps4 linker_spv_modules)
+target_include_directories(shadps4 PRIVATE ${LINKER_SPV_MODULES_INCLUDE})
 # embed resources
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CMakeRC.cmake")
@@ -1420,6 +1423,10 @@ target_include_directories(shadps4 PRIVATE ${IMGUI_RESOURCES_INCLUDE})
 if (ENABLE_DISCORD_RPC)
     target_link_libraries(shadps4 PRIVATE discord-rpc)
 endif()
+
+target_link_libraries(shadps4 PRIVATE spirv-reflect-static)
+
+target_link_libraries(shadps4 PRIVATE SPIRV-Tools-link)
 
 # Install rules
 install(TARGETS shadps4 BUNDLE DESTINATION .)

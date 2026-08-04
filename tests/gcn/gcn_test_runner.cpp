@@ -863,7 +863,7 @@ std::expected<void, ErrorInfo> Runner::run_raw_ordered_count(std::span<const std
     double time = (end - start) * period;
     double ms = time / 1000000;
 
-    printf("time: %lf\n", ms);
+    printf("time: %lf ms\n", ms);
 #endif
 
     results.resize(num_results);

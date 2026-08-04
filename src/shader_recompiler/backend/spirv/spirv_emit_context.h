@@ -193,6 +193,8 @@ public:
         return OpLoad(U32[1], ptr);
     }
 
+    void InsertMainFunctionOpVariables();
+
     Info& info;
     const RuntimeInfo& runtime_info;
     const Profile& profile;
@@ -393,11 +395,18 @@ public:
     Id read_const_dynamic{};
 
     // Ordered count stuff
-    Id ordered_count_function{};
+    Id init_emulated_workgroup_index_function{};
+    Id ordered_count_add_function{};
+    Id ordered_count_swap_function{};
+    std::array<Id, 4> ordered_count_function_arg_vars{};
+
     Id emulated_workgroup_id_id{};
     Id ordered_count_shared_mem_variable{};
     u32 max_num_subgroups{};
     Id ordered_count_subgroup_counts_array_type{};
+
+    u32 ordered_count_utility_buffer_binding{};
+    u32 shared_mem_ordered_count_base;
 
 private:
     void DefineArithmeticTypes();
@@ -426,7 +435,7 @@ private:
 
     Id GetBufferSize(u32 sharp_idx);
 
-    Id DefineOrderedCountFunction();
+    void DefineOrderedCountFunctions();
 };
 
 } // namespace Shader::Backend::SPIRV

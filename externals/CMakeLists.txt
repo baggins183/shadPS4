@@ -104,8 +104,8 @@ endif()
 
 # glslang
 if (NOT TARGET glslang::glslang)
-    set(SKIP_GLSLANG_INSTALL ON CACHE BOOL "")
-    set(ENABLE_GLSLANG_BINARIES OFF CACHE BOOL "")
+    set(SKIP_GLSLANG_INSTALL OFF CACHE BOOL "")
+    set(ENABLE_GLSLANG_BINARIES ON CACHE BOOL "")
     set(ENABLE_SPVREMAPPER OFF CACHE BOOL "")
     set(ENABLE_CTEST OFF CACHE BOOL "")
     set(ENABLE_HLSL OFF CACHE BOOL "")
@@ -113,7 +113,7 @@ if (NOT TARGET glslang::glslang)
     set(ENABLE_OPT OFF CACHE BOOL "")
     add_subdirectory(glslang)
     file(COPY glslang/SPIRV DESTINATION glslang/glslang FILES_MATCHING PATTERN "*.h")
-    target_include_directories(glslang INTERFACE "${CMAKE_CURRENT_BINARY_DIR}/glslang")
+    target_include_directories(glslang PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/glslang")
 endif()
 
 # Robin-map
@@ -158,7 +158,11 @@ if (NOT TARGET Zydis::Zydis)
     add_subdirectory(zydis)
 endif()
 
+# spirv-headers
+add_subdirectory(spirv-headers)
+
 # sirit
+set(SIRIT_USE_SYSTEM_SPIRV_HEADERS ON CACHE BOOL "" FORCE)
 add_subdirectory(sirit)
 if (WIN32)
     target_compile_options(sirit PRIVATE $<$<CXX_COMPILER_ID:Clang>:-Wno-error=unused-command-line-argument>)
@@ -417,3 +421,12 @@ if (NOT TARGET ZArchive::zarchive)
     target_compile_features(zarchive PRIVATE cxx_std_20)
     add_library(ZArchive::zarchive ALIAS zarchive)
 endif()
+
+# SPIRV-Reflect
+set(SPIRV_REFLECT_STATIC_LIB ON CACHE BOOL "" FORCE)
+add_subdirectory(SPIRV-Reflect)
+
+# SPIRV-Tools
+set(SPIRV_SKIP_TESTS ON CACHE BOOL "" FORCE)
+set(SPIRV_SKIP_EXECUTABLES ON CACHE BOOL "" FORCE)
+add_subdirectory(spirv-tools)
