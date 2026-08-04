@@ -650,8 +650,8 @@ TEST_F(GcnTest, pk_add_f16_op_sel_reversed) {
 TEST_F(GcnTest, ds_ordered_count) {
     auto runner = gcn_test::Runner::instance_ordered_count().value();
 
-    static constexpr u32 workgroup_size = 64;
-    static constexpr u32 num_workgroups = 2;
+    static constexpr u32 workgroup_size = 256;
+    static constexpr u32 num_workgroups = 10000;
     static constexpr u32 total_num_threads = workgroup_size * num_workgroups;
 
     printf("workgroup_size : %u\n", workgroup_size);

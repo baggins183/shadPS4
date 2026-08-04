@@ -3,8 +3,31 @@
 
 #pragma once
 
+#include "common/bit_field.h"
 #include "common/types.h"
 namespace OrderedCount {
+
+enum class ShaderType : u32 {
+    Cs = 0,
+    Ps = 1,
+    Vs = 2,
+    Gs = 3,
+};
+
+enum class Op : u32 {
+    Add = 0,
+    Swap = 1,
+    Wrap = 3,
+};
+
+union Flags {
+    BitField<2, 6, u32> packer_id;
+    BitField<8, 1, u32> wave_release;
+    BitField<9, 1, u32> wave_done;
+    BitField<10, 2, ShaderType> shader_type;
+    BitField<12, 2, Op> instruction_type;
+    u32 raw;
+};
 
 // Assume only one counter for now
 // in bytes
