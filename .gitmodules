@@ -164,3 +164,13 @@
 [submodule "externals/zarchive"]
 	path = externals/zarchive
 	url = https://github.com/shadexternals/ZArchive.git
+[submodule "externals/SPIRV-Reflect"]
+	path = externals/SPIRV-Reflect
+	url = https://github.com/KhronosGroup/SPIRV-Reflect.git
+[submodule "externals/spirv-headers"]
+	path = externals/spirv-headers
+	url = https://github.com/KhronosGroup/Spirv-headers.git
+[submodule "externals/spirv-tools"]
+	path = externals/spirv-tools
+	url = https://github.com/KhronosGroup/Spirv-tools.git
+
