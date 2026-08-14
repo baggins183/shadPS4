@@ -159,8 +159,8 @@ bool InitializeCompiler() {
 }
 } // Anonymous namespace
 
-vk::ShaderModule Compile(std::string_view code, vk::ShaderStageFlagBits stage, vk::Device device,
-                         std::vector<std::string> defines) {
+static std::vector<u32> CompileToSpv(std::string_view code, EShLanguage lang, bool is_library,
+                                     std::vector<std::string> defines) {
     if (!InitializeCompiler()) {
         return {};
     }
@@ -168,7 +168,6 @@ vk::ShaderModule Compile(std::string_view code, vk::ShaderStageFlagBits stage, v
     EProfile profile = ECoreProfile;
     EShMessages messages =
         static_cast<EShMessages>(EShMsgDefault | EShMsgSpvRules | EShMsgVulkanRules);
-    EShLanguage lang = ToEshShaderStage(stage);
 
     const int default_version = 450;
     const char* pass_source_code = code.data();
@@ -196,6 +195,10 @@ vk::ShaderModule Compile(std::string_view code, vk::ShaderStageFlagBits stage, v
 
     shader->setPreamble(preambleString.c_str());
     shader->addProcesses(processes);
+
+    if (is_library) {
+        shader->setCompileOnly();
+    }
 
     glslang::TShader::ForbidIncluder includer;
 
@@ -242,7 +245,8 @@ vk::ShaderModule Compile(std::string_view code, vk::ShaderStageFlagBits stage, v
     // Enable optimizations on the generated SPIR-V code.
     options.disableOptimizer = false;
     options.validate = false;
-    options.optimizeSize = true;
+    // TODO
+    options.optimizeSize = !is_library;
 
     glslang::GlslangToSpv(*intermediate, out_code, &logger, &options);
 
@@ -251,7 +255,21 @@ vk::ShaderModule Compile(std::string_view code, vk::ShaderStageFlagBits stage, v
         LOG_INFO(Render_Vulkan, "SPIR-V conversion messages: {}", spv_messages);
     }
 
+    return out_code;
+}
+
+vk::ShaderModule Compile(std::string_view code, vk::ShaderStageFlagBits stage, vk::Device device,
+                         std::vector<std::string> defines) {
+    EShLanguage lang = ToEshShaderStage(stage);
+    std::vector<u32> out_code = CompileToSpv(code, lang, false, defines);
     return CompileSPV(out_code, device);
+}
+
+std::vector<u32> CompileSpvLibrary(std::string_view code, vk::ShaderStageFlagBits stage,
+                                   std::vector<std::string> defines) {
+    EShLanguage lang = ToEshShaderStage(stage);
+    std::vector<u32> out_code = CompileToSpv(code, lang, true, defines);
+    return out_code;
 }
 
 vk::ShaderModule CompileSPV(std::span<const u32> code, vk::Device device) {
