@@ -19,6 +19,9 @@ namespace Vulkan {
 vk::ShaderModule Compile(std::string_view code, vk::ShaderStageFlagBits stage, vk::Device device,
                          std::vector<std::string> defines = {});
 
+std::vector<u32> CompileSpvLibrary(std::string_view code, vk::ShaderStageFlagBits stage,
+                                   std::vector<std::string> defines = {});
+
 /**
  * @brief Creates a vulkan shader module from SPIR-V bytecode.
  * @param code The SPIR-V bytecode data.

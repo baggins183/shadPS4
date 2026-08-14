@@ -206,10 +206,6 @@ target_link_libraries(shadps4_gcn_test PRIVATE
     SPIRV-Tools-link
 )
 
-add_subdirectory(${CMAKE_SOURCE_DIR}/src/shader_recompiler/backend/spirv/linker_modules ${CMAKE_BINARY_DIR}/linker_modules)
-add_dependencies(shadps4_gcn_test linker_spv_modules)   
-target_include_directories(shadps4_gcn_test PRIVATE ${LINKER_SPV_MODULES_INCLUDE})
-
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR
     CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
     include(CheckCXXSymbolExists)

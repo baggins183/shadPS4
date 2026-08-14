@@ -18,10 +18,11 @@
 #include "shader_recompiler/ir/program.h"
 #include "shader_recompiler/runtime_info.h"
 
-#include "ordered_count_spv_lib_comp.h"
-#include "shader_recompiler/backend/spirv/linker_modules/common/ordered_count.h"
+#include "shader_recompiler/backend/spirv/ordered_count_defines.h"
 #include "spirv-tools/linker.hpp"
 #include "spirv_reflect.h"
+#include "video_core/host_shaders/ordered_count_comp.h"
+#include "video_core/renderer_vulkan/vk_shader_util.h"
 
 namespace Shader::Backend::SPIRV {
 namespace {
@@ -720,18 +721,19 @@ std::vector<u32> LinkSPIRV(EmitContext& ctx, const Profile& profile,
 
         spirv_tools.Validate(main_module);
 
-        std::vector<const u32*> all_spirv;
-        std::vector<size_t> sizes;
+        std::vector<std::vector<u32>> all_spirv;
 
-        all_spirv.push_back(main_module.data());
-        sizes.push_back(main_module.size());
-
-        std::vector<u32> ordered_count_spirv;
+        all_spirv.push_back(std::move(main_module));
 
         if (info.UsesOrderedCount()) {
-            ordered_count_spirv =
-                std::vector<u32>(ordered_count_spv_lib_comp_data,
-                                 ordered_count_spv_lib_comp_data + ordered_count_spv_lib_comp_size);
+            // TODO can use call_once
+            std::vector<u32> ordered_count_spirv = Vulkan::CompileSpvLibrary(
+                HostShaders::ORDERED_COUNT_COMP, vk::ShaderStageFlagBits::eCompute,
+                {
+                    fmt::format("MAX_NUM_SUBGROUPS_SPEC_ID={}", MAX_NUM_SUBGROUPS_SPEC_ID),
+                    fmt::format("ORDERED_COUNT_UTILITY_BUFFER_BINDING={}",
+                                ORDERED_COUNT_UTILITY_BUFFER_BINDING),
+                });
 
             spirv_tools.Validate(ordered_count_spirv);
 
@@ -740,8 +742,7 @@ std::vector<u32> LinkSPIRV(EmitContext& ctx, const Profile& profile,
 
             spirv_tools.Validate(main_module);
 
-            all_spirv.push_back(ordered_count_spirv.data());
-            sizes.push_back(ordered_count_spirv.size());
+            all_spirv.push_back(std::move(ordered_count_spirv));
         }
 
         spvtools::LinkerOptions spv_link_options;
@@ -750,8 +751,8 @@ std::vector<u32> LinkSPIRV(EmitContext& ctx, const Profile& profile,
 
         std::vector<u32> final_module;
 
-        spv_result_t result = spvtools::Link(link_context, all_spirv.data(), sizes.data(),
-                                             all_spirv.size(), &final_module, spv_link_options);
+        spv_result_t result =
+            spvtools::Link(link_context, all_spirv, &final_module, spv_link_options);
         ASSERT(result == SPV_SUCCESS);
         return final_module;
     } else {

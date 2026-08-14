@@ -1387,10 +1387,7 @@ set(HOST_SHADERS_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/src/video_core/host_shaders
 add_subdirectory(${HOST_SHADERS_INCLUDE})
 add_dependencies(shadps4 host_shaders)
 target_include_directories(shadps4 PRIVATE ${HOST_SHADERS_INCLUDE})
-    
-add_subdirectory(src/shader_recompiler/backend/spirv/linker_modules)
-add_dependencies(shadps4 linker_spv_modules)
-target_include_directories(shadps4 PRIVATE ${LINKER_SPV_MODULES_INCLUDE})
+
 # embed resources
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CMakeRC.cmake")

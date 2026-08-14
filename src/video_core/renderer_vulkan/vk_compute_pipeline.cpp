@@ -4,7 +4,7 @@
 #include <boost/container/small_vector.hpp>
 
 #include "common/div_ceil.h"
-#include "shader_recompiler/backend/spirv/linker_modules/common/ordered_count.h"
+#include "shader_recompiler/backend/spirv/ordered_count_defines.h"
 #include "shader_recompiler/info.h"
 #include "video_core/renderer_vulkan/vk_compute_pipeline.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
