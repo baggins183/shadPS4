@@ -175,8 +175,14 @@ static std::vector<u32> CompileToSpv(std::string_view code, EShLanguage lang, bo
 
     auto shader = std::make_unique<glslang::TShader>(lang);
     shader->setEnvTarget(glslang::EShTargetSpv,
-                         glslang::EShTargetLanguageVersion::EShTargetSpv_1_3);
+                         glslang::EShTargetLanguageVersion::EShTargetSpv_1_6);
+    shader->setEnvClient(glslang::EShClient::EShClientVulkan,
+                         glslang::EShTargetClientVersion::EShTargetVulkan_1_4);
     shader->setStringsWithLengths(&pass_source_code, &pass_source_code_length, 1);
+
+    if (is_library) {
+        shader->setCompileOnly();
+    }
 
     std::string preambleString;
     std::vector<std::string> processes;
@@ -195,10 +201,6 @@ static std::vector<u32> CompileToSpv(std::string_view code, EShLanguage lang, bo
 
     shader->setPreamble(preambleString.c_str());
     shader->addProcesses(processes);
-
-    if (is_library) {
-        shader->setCompileOnly();
-    }
 
     glslang::TShader::ForbidIncluder includer;
 
@@ -225,19 +227,6 @@ static std::vector<u32> CompileToSpv(std::string_view code, EShLanguage lang, bo
         return {};
     }
 
-    // Even though there's only a single shader, we still need to link it to generate SPV
-    auto program = std::make_unique<glslang::TProgram>();
-    program->addShader(shader.get());
-    if (!program->link(messages)) {
-        LOG_ERROR(Render_Vulkan,
-                  "Shader link error\n"
-                  "Program Info Log:\n"
-                  "{}\n{}",
-                  program->getInfoLog(), program->getInfoDebugLog());
-        return {};
-    }
-
-    glslang::TIntermediate* intermediate = program->getIntermediate(lang);
     std::vector<u32> out_code;
     spv::SpvBuildLogger logger;
     glslang::SpvOptions options;
@@ -245,10 +234,27 @@ static std::vector<u32> CompileToSpv(std::string_view code, EShLanguage lang, bo
     // Enable optimizations on the generated SPIR-V code.
     options.disableOptimizer = false;
     options.validate = false;
-    // TODO
-    options.optimizeSize = !is_library;
 
-    glslang::GlslangToSpv(*intermediate, out_code, &logger, &options);
+    if (is_library) {
+        options.compileOnly = true;
+        glslang::TIntermediate* intermediate = shader->getIntermediate();
+        glslang::GlslangToSpv(*intermediate, out_code, &logger, &options);
+    } else {
+        options.optimizeSize = true;
+        // Even though there's only a single shader, we still need to link it to generate SPV
+        auto program = std::make_unique<glslang::TProgram>();
+        program->addShader(shader.get());
+        if (!program->link(messages)) {
+            LOG_ERROR(Render_Vulkan,
+                      "Shader link error\n"
+                      "Program Info Log:\n"
+                      "{}\n{}",
+                      program->getInfoLog(), program->getInfoDebugLog());
+            return {};
+        }
+        glslang::TIntermediate* intermediate = program->getIntermediate(lang);
+        glslang::GlslangToSpv(*intermediate, out_code, &logger, &options);
+    }
 
     const std::string spv_messages = logger.getAllMessages();
     if (!spv_messages.empty()) {

@@ -1421,7 +1421,7 @@ if (ENABLE_DISCORD_RPC)
     target_link_libraries(shadps4 PRIVATE discord-rpc)
 endif()
 
-target_link_libraries(shadps4 PRIVATE spirv-reflect-static)
+#target_link_libraries(shadps4 PRIVATE spirv-reflect-static)
 
 target_link_libraries(shadps4 PRIVATE SPIRV-Tools-link)
 

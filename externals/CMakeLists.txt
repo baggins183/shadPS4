@@ -424,7 +424,7 @@ endif()
 
 # SPIRV-Reflect
 set(SPIRV_REFLECT_STATIC_LIB ON CACHE BOOL "" FORCE)
-add_subdirectory(SPIRV-Reflect)
+#add_subdirectory(SPIRV-Reflect)
 
 # SPIRV-Tools
 set(SPIRV_SKIP_TESTS ON CACHE BOOL "" FORCE)

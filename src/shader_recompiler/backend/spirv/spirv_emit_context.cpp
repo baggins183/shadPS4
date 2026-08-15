@@ -834,10 +834,7 @@ void EmitContext::DefineBuffers() {
             bda_pagetable_index = buffers.size();
         } else if (desc.buffer_type == BufferType::FaultBuffer) {
             fault_buffer_index = buffers.size();
-        } else if (desc.buffer_type == BufferType::OrderedCountUtility) {
-            ordered_count_utility_buffer_index = buffers.size();
         }
-
         // Define aliases depending on the shader usage.
         auto& spv_buffer = buffers.emplace_back(binding.buffer++, desc.buffer_type);
         if (True(desc.used_types & IR::Type::U64)) {
@@ -1087,6 +1084,13 @@ void EmitContext::DefineSharedMemory() {
 
     // For now, only one scenario where we need scratch memory (shader has DS_ORDERED_COUNT)
     if (info.UsesOrderedCount()) {
+        auto& threadgroup_dims = runtime_info.cs_info.workgroup_size;
+        const u32 threadgroup_size =
+            threadgroup_dims[0] * threadgroup_dims[1] * threadgroup_dims[2];
+        // TODO: this is potentially innacurate, may need to be conservative or mess with
+        // VK_EXT_subgroup_size_control
+        max_num_subgroups = Common::DivCeil(threadgroup_size, profile.subgroup_size);
+
         shared_mem_ordered_count_base = Common::AlignUp(shared_mem_total_size, 32 /*TODO*/);
         u32 shared_mem_ordered_count_size = 4 * max_num_subgroups + 4;
         shared_mem_total_size = shared_mem_ordered_count_base + shared_mem_ordered_count_size;

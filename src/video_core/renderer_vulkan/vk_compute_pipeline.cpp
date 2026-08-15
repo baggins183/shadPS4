@@ -32,34 +32,11 @@ ComputePipeline::ComputePipeline(const Instance& instance, Scheduler& scheduler,
     std::vector<u32> spec_data;
     std::vector<vk::SpecializationMapEntry> spec_map_entries;
 
-    if (info->UsesOrderedCount()) {
-        auto& threadgroup_dims = runtime_info.cs_info.workgroup_size;
-        const u32 threadgroup_size =
-            threadgroup_dims[0] * threadgroup_dims[1] * threadgroup_dims[2];
-        // TODO: this is potentially innacurate, may need to be conservative or mess with
-        // VK_EXT_subgroup_size_control
-        u32 max_num_subgroups = Common::DivCeil(threadgroup_size, profile.subgroup_size);
-        const vk::SpecializationMapEntry spec_map_entry = {
-            .constantID = MAX_NUM_SUBGROUPS_SPEC_ID,
-            .offset = static_cast<uint32_t>(spec_data.size() * sizeof(u32)),
-            .size = sizeof(u32)};
-        spec_data.push_back(max_num_subgroups);
-        spec_map_entries.push_back(spec_map_entry);
-    }
-
-    vk::SpecializationInfo spec_info = {
-        .mapEntryCount = static_cast<uint32_t>(spec_map_entries.size()),
-        .pMapEntries = spec_map_entries.data(),
-        .dataSize = spec_data.size() * sizeof(u32),
-        .pData = spec_data.data(),
-    };
-
     const vk::PipelineShaderStageCreateInfo shader_ci = {
         .pNext = instance.IsSubgroupSize64Supported() ? &subgroup_size_ci : nullptr,
         .stage = vk::ShaderStageFlagBits::eCompute,
         .module = module,
-        .pName = "main",
-        .pSpecializationInfo = !spec_map_entries.empty() ? &spec_info : nullptr};
+        .pName = "main"};
 
     u32 binding{};
     boost::container::small_vector<vk::DescriptorSetLayoutBinding, 32> bindings;

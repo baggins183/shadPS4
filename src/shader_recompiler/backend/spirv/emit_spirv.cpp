@@ -7,7 +7,7 @@
 #include <vector>
 #include <magic_enum/magic_enum.hpp>
 
-#include <spirv_reflect.h>
+// #include <spirv_reflect.h>
 #include "common/assert.h"
 #include "common/func_traits.h"
 #include "shader_recompiler/backend/spirv/emit_spirv.h"
@@ -20,7 +20,6 @@
 
 #include "shader_recompiler/backend/spirv/ordered_count_defines.h"
 #include "spirv-tools/linker.hpp"
-#include "spirv_reflect.h"
 #include "video_core/host_shaders/ordered_count_comp.h"
 #include "video_core/renderer_vulkan/vk_shader_util.h"
 
@@ -650,49 +649,6 @@ void PatchPhiNodes(const IR::Program& program, EmitContext& ctx) {
     });
 }
 
-std::vector<u32> PatchOrderedCountSPIRV(EmitContext& ctx, const Profile& profile,
-                                        const RuntimeInfo& runtime_info, const IR::Program& program,
-                                        std::vector<u32>& spirv) {
-
-    SpvReflectShaderModule module{};
-    SpvReflectResult result =
-        spvReflectCreateShaderModule(spirv.size() * sizeof(u32), spirv.data(), &module);
-    assert(result == SPV_REFLECT_RESULT_SUCCESS);
-
-    // patch placeholder binding numbers used in the library
-    const SpvReflectDescriptorBinding* binding =
-        spvReflectGetDescriptorBinding(&module, ORDERED_COUNT_UTILITY_BUFFER_BINDING, 0, &result);
-    ASSERT(result == SPV_REFLECT_RESULT_SUCCESS);
-
-    result = spvReflectChangeDescriptorBindingNumbers(&module, binding,
-                                                      ctx.ordered_count_utility_buffer_binding, 0);
-    ASSERT(result == SPV_REFLECT_RESULT_SUCCESS);
-
-    // Patch shared mem block by adding base offset to all top-level members
-    const u32 shared_block_base_offset = ctx.shared_mem_ordered_count_base;
-    u32 num_shared_blocks;
-    spvReflectEnumerateWorkgroupMemoryBlocks(&module, &num_shared_blocks, NULL);
-    ASSERT(num_shared_blocks == 1);
-    SpvReflectBlockVariable* shared_block;
-    spvReflectEnumerateWorkgroupMemoryBlocks(&module, &num_shared_blocks, &shared_block);
-
-    result =
-        spvReflectAddBaseOffsetToBlockVariable(&module, shared_block, shared_block_base_offset);
-    ASSERT(result == SPV_REFLECT_RESULT_SUCCESS);
-
-    // replace with patched code
-    const u32* code_ptr = spvReflectGetCode(&module);
-    size_t new_size = spvReflectGetCodeSize(&module) / 4;
-
-    // TODO spec const for max_num_subgroups
-
-    std::vector<u32> new_code(code_ptr, code_ptr + new_size);
-
-    spvReflectDestroyShaderModule(&module);
-
-    return new_code;
-}
-
 std::vector<u32> LinkSPIRV(EmitContext& ctx, const Profile& profile,
                            const RuntimeInfo& runtime_info, const IR::Program& program,
                            std::vector<u32>& main_module) {
@@ -723,24 +679,19 @@ std::vector<u32> LinkSPIRV(EmitContext& ctx, const Profile& profile,
 
         std::vector<std::vector<u32>> all_spirv;
 
+        spirv_tools.Validate(main_module);
         all_spirv.push_back(std::move(main_module));
 
         if (info.UsesOrderedCount()) {
-            // TODO can use call_once
+            // For now do all specialization with GLSL defines
             std::vector<u32> ordered_count_spirv = Vulkan::CompileSpvLibrary(
                 HostShaders::ORDERED_COUNT_COMP, vk::ShaderStageFlagBits::eCompute,
                 {
-                    fmt::format("MAX_NUM_SUBGROUPS_SPEC_ID={}", MAX_NUM_SUBGROUPS_SPEC_ID),
-                    fmt::format("ORDERED_COUNT_UTILITY_BUFFER_BINDING={}",
-                                ORDERED_COUNT_UTILITY_BUFFER_BINDING),
+                    fmt::format("MAX_NUM_SUBGROUPS={}", ctx.max_num_subgroups),
+                    fmt::format("UTILITY_BUFFER_BINDING={}",
+                                ctx.ordered_count_utility_buffer_binding),
+                    fmt::format("SHARED_MEMORY_BASE_OFFSET={}", ctx.shared_mem_ordered_count_base),
                 });
-
-            spirv_tools.Validate(ordered_count_spirv);
-
-            ordered_count_spirv =
-                PatchOrderedCountSPIRV(ctx, profile, runtime_info, program, ordered_count_spirv);
-
-            spirv_tools.Validate(main_module);
 
             all_spirv.push_back(std::move(ordered_count_spirv));
         }

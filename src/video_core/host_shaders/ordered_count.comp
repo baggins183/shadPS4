@@ -10,6 +10,7 @@
 #extension GL_KHR_memory_scope_semantics : require
 
 #if 1
+// Force memory model
 #extension GL_EXT_buffer_reference : require
 
 layout (buffer_reference) buffer BufferRef {
@@ -21,16 +22,14 @@ void dummy (BufferRef ref) {
 }
 #endif
 
-layout(constant_id = MAX_NUM_SUBGROUPS_SPEC_ID) const int max_num_sugroups = 1;
-
 layout(std430) shared shared_mem_ordered_count
 {
+    layout (offset = SHARED_MEMORY_BASE_OFFSET)
+    uint subgroup_counts[MAX_NUM_SUBGROUPS];
     uint scratch_val;
-    // place last so we can actually specialze the length and maintain proper offsets
-    uint subgroup_counts[max_num_sugroups];
 };
 
-layout(set = 0, binding = ORDERED_COUNT_UTILITY_BUFFER_BINDING, std430) buffer ordered_count_utility
+layout(set = 0, binding = UTILITY_BUFFER_BINDING, std430) buffer ordered_count_utility
 {
     uint emulated_block_id_assignment;
     uint next_block_owner_id;
