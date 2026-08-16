@@ -16,11 +16,16 @@ layout(std430) shared shared_mem_ordered_count
     uint scratch_val;
 };
 
-layout(set = 0, binding = UTILITY_BUFFER_BINDING, std430) buffer ordered_count_utility
-{
-    uint emulated_block_id_assignment;
+struct Counter {
     uint next_block_owner_id;
     uint global_count;
+};
+
+layout(std430, set = 0, binding = UTILITY_BUFFER_BINDING) buffer ordered_count_utility
+{
+    uint emulated_block_id_assignment;
+    // TODO play with offsets for cache opts
+    Counter counters[NUM_COUNTERS];
 };
 
 // Grab a workgroup index by bumping a counter "next_emulated_workgroup_index"
@@ -68,14 +73,14 @@ uint ordered_count(uint block_index, uint packer_id, bool is_active)
 
         for (;;)
         {
-            uint val = atomicLoad(next_block_owner_id, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
+            uint val = atomicLoad(counters[packer_id].next_block_owner_id, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
             if (val == block_index) {
                 break;
             }
         }
 
-        uint prev_count = atomicAdd(global_count, block_count);
-        atomicStore(next_block_owner_id, block_index + 1, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
+        uint prev_count = atomicAdd(counters[packer_id].global_count, block_count);
+        atomicStore(counters[packer_id].next_block_owner_id, block_index + 1, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
         scratch_val = prev_count;
     }
 
@@ -98,14 +103,14 @@ uint ordered_count_per_wave(uint block_index, uint packer_id, uint value, bool i
     if (gl_SubgroupInvocationID == 0) {
         for (;;)
         {
-            uint val = atomicLoad(next_block_owner_id, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
+            uint val = atomicLoad(counters[packer_id].next_block_owner_id, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
             if (val == target_index) {
                 break;
             }
         }
 
-        prev_count = atomicAdd(global_count, subgroup_count);
-        atomicStore(next_block_owner_id, target_index + 1, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
+        prev_count = atomicAdd(counters[packer_id].global_count, subgroup_count);
+        atomicStore(counters[packer_id].next_block_owner_id, target_index + 1, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
     }
 
     subgroupBarrier();
@@ -129,14 +134,14 @@ uint ordered_count_swap_per_wave(uint block_index, uint packer_id, uint value, b
     if (gl_SubgroupInvocationID == 0) {
         for (;;)
         {
-            uint val = atomicLoad(next_block_owner_id, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
+            uint val = atomicLoad(counters[packer_id].next_block_owner_id, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
             if (val == target_index) {
                 break;
             }
         }
 
-        prev_count = atomicExchange(global_count, subgroup_count);
-        atomicStore(next_block_owner_id, target_index + 1, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
+        prev_count = atomicExchange(counters[packer_id].global_count, subgroup_count);
+        atomicStore(counters[packer_id].next_block_owner_id, target_index + 1, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
     }
 
     subgroupBarrier();
@@ -162,14 +167,14 @@ uint ordered_count_one_thread(uint block_index, uint packer_id, uint value, bool
 
     for (;;)
     {
-        uint val = atomicLoad(next_block_owner_id, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
+        uint val = atomicLoad(counters[packer_id].next_block_owner_id, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
         if (val == target_index) {
             break;
         }
     }
 
-    prev_count = atomicAdd(global_count, value);
-    atomicStore(next_block_owner_id, target_index + 1, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
+    prev_count = atomicAdd(counters[packer_id].global_count, value);
+    atomicStore(counters[packer_id].next_block_owner_id, target_index + 1, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
 
     return prev_count;
 }
@@ -181,14 +186,14 @@ uint ordered_count_swap_one_thread(uint block_index, uint packer_id, uint value,
 
     for (;;)
     {
-        uint val = atomicLoad(next_block_owner_id, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
+        uint val = atomicLoad(counters[packer_id].next_block_owner_id, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
         if (val == target_index) {
             break;
         }
     }
 
-    prev_count = atomicExchange(global_count, value);
-    atomicStore(next_block_owner_id, target_index + 1, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
+    prev_count = atomicExchange(counters[packer_id].global_count, value);
+    atomicStore(counters[packer_id].next_block_owner_id, target_index + 1, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
 
     return prev_count;
 }

@@ -214,8 +214,7 @@ struct Info : InfoPersistent {
     }
 
     u32 OrderedCountUtilityBufferSize() const {
-        // TODO
-        return OrderedCount::UtilityBufferSize;
+        return sizeof(u32) * (1 + 2 * num_ordered_count_packers);
     }
 
     bool UsesSharedMemoryBlocks() const {

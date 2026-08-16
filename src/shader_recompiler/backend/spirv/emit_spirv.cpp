@@ -18,7 +18,6 @@
 #include "shader_recompiler/ir/program.h"
 #include "shader_recompiler/runtime_info.h"
 
-#include "shader_recompiler/backend/spirv/ordered_count_defines.h"
 #include "spirv-tools/linker.hpp"
 #include "video_core/host_shaders/ordered_count_comp.h"
 #include "video_core/renderer_vulkan/vk_shader_util.h"
@@ -686,6 +685,7 @@ std::vector<u32> LinkSPIRV(EmitContext& ctx, const Profile& profile,
                     fmt::format("UTILITY_BUFFER_BINDING={}",
                                 ctx.ordered_count_utility_buffer_binding),
                     fmt::format("SHARED_MEMORY_BASE_OFFSET={}", ctx.shared_mem_ordered_count_base),
+                    fmt::format("NUM_COUNTERS={}", info.num_ordered_count_packers),
                 });
 
             all_spirv.push_back(std::move(ordered_count_spirv));
