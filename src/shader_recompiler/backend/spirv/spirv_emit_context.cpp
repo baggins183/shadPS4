@@ -1308,13 +1308,4 @@ void EmitContext::DefineFunctions() {
     }
 }
 
-void EmitContext::InsertMainFunctionOpVariables() {
-    if (info.UsesOrderedCount()) {
-        ordered_count_function_arg_vars[0] = DefineVar<false>(U32[1], spv::StorageClass::Function);
-        ordered_count_function_arg_vars[1] = DefineVar<false>(U32[1], spv::StorageClass::Function);
-        ordered_count_function_arg_vars[2] = DefineVar<false>(U32[1], spv::StorageClass::Function);
-        ordered_count_function_arg_vars[3] = DefineVar<false>(U1[1], spv::StorageClass::Function);
-    }
-}
-
 } // namespace Shader::Backend::SPIRV

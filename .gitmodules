@@ -16,8 +16,10 @@
 	shallow = true
 [submodule "externals/glslang"]
 	path = externals/glslang
-	url = https://github.com/KhronosGroup/glslang.git
+	#url = https://github.com/KhronosGroup/glslang.git
+	url = https://github.com/baggins183/glslang.git
 	shallow = true
+	branch = shared_block_compile_only_fix
 [submodule "externals/robin-map"]
 	path = externals/robin-map
 	url = https://github.com/Tessil/robin-map.git
@@ -172,5 +174,7 @@
 	url = https://github.com/KhronosGroup/Spirv-headers.git
 [submodule "externals/spirv-tools"]
 	path = externals/spirv-tools
-	url = https://github.com/KhronosGroup/Spirv-tools.git
+	#url = https://github.com/KhronosGroup/Spirv-tools.git
+	url = https://github.com/baggins183/SPIRV-Tools.git
+	branch = rvalues_and_addressing_model
 

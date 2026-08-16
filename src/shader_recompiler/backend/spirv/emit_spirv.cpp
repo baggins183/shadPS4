@@ -149,7 +149,6 @@ Id TypeId(const EmitContext& ctx, IR::Type type) {
 
 void Traverse(EmitContext& ctx, const IR::Program& program) {
     IR::Block* current_block{};
-    bool is_first{true};
     for (const IR::AbstractSyntaxNode& node : program.syntax_list) {
         switch (node.type) {
         case IR::AbstractSyntaxNode::Type::Block: {
@@ -159,10 +158,6 @@ void Traverse(EmitContext& ctx, const IR::Program& program) {
             }
             current_block = node.data.block;
             ctx.AddLabel(label);
-            if (is_first) {
-                ctx.InsertMainFunctionOpVariables();
-                is_first = false;
-            }
             for (IR::Inst& inst : node.data.block->Instructions()) {
                 EmitInst(ctx, &inst);
             }
@@ -698,7 +693,11 @@ std::vector<u32> LinkSPIRV(EmitContext& ctx, const Profile& profile,
 
         spvtools::LinkerOptions spv_link_options;
         spv_link_options.SetVerifyIds(true);
-        spv_link_options.SetCreateLibrary(false);
+        spv_link_options.SetResolveAddressingModelMismatch(true);
+        // Allow mismatches where, for example, caller passes a uint and callee expects a function
+        // pointer to uint (glslang's convention)
+        spv_link_options.SetAllowRValueLValueMismatch(true);
+        // TODO fix spirv link to add aliased to shared mem blocks when >1
 
         std::vector<u32> final_module;
 

@@ -9,19 +9,6 @@
 #extension GL_KHR_shader_subgroup_arithmetic : require
 #extension GL_KHR_memory_scope_semantics : require
 
-#if 1
-// Force memory model
-#extension GL_EXT_buffer_reference : require
-
-layout (buffer_reference) buffer BufferRef {
-    uint a;
-};
-
-void dummy (BufferRef ref) {
-    ref.a = 5;
-}
-#endif
-
 layout(std430) shared shared_mem_ordered_count
 {
     layout (offset = SHARED_MEMORY_BASE_OFFSET)

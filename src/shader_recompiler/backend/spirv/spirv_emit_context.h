@@ -193,8 +193,6 @@ public:
         return OpLoad(U32[1], ptr);
     }
 
-    void InsertMainFunctionOpVariables();
-
     Info& info;
     const RuntimeInfo& runtime_info;
     const Profile& profile;
@@ -397,7 +395,6 @@ public:
     Id init_emulated_workgroup_index_function{};
     Id ordered_count_add_function{};
     Id ordered_count_swap_function{};
-    std::array<Id, 4> ordered_count_function_arg_vars{};
 
     Id emulated_workgroup_id_id{};
     Id ordered_count_shared_mem_variable{};
