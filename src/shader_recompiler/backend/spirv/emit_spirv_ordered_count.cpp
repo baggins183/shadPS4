@@ -56,6 +56,8 @@ void EmitContext::DefineOrderedCountFunctions() {
 Id EmitOrderedCount(EmitContext& ctx, IR::Inst* inst, u32 packer_id, Id value, Id is_active) {
     auto flags = inst->Flags<OrderedCount::Flags>();
 
+    ASSERT(flags.wave_release.Value());
+
     Id function;
     switch (flags.instruction_type.Value()) {
     case OrderedCount::Op::Add:

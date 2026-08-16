@@ -4,7 +4,6 @@
 #include <boost/container/small_vector.hpp>
 
 #include "common/div_ceil.h"
-#include "shader_recompiler/backend/spirv/ordered_count_defines.h"
 #include "shader_recompiler/info.h"
 #include "video_core/renderer_vulkan/vk_compute_pipeline.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
@@ -27,10 +26,6 @@ ComputePipeline::ComputePipeline(const Instance& instance, Scheduler& scheduler,
     const vk::PipelineShaderStageRequiredSubgroupSizeCreateInfo subgroup_size_ci = {
         .requiredSubgroupSize = 64,
     };
-
-    // TODO
-    std::vector<u32> spec_data;
-    std::vector<vk::SpecializationMapEntry> spec_map_entries;
 
     const vk::PipelineShaderStageCreateInfo shader_ci = {
         .pNext = instance.IsSubgroupSize64Supported() ? &subgroup_size_ci : nullptr,

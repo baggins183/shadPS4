@@ -29,20 +29,4 @@ union Flags {
     u32 raw;
 };
 
-// Assume only one counter for now
-// in bytes
-static constexpr u32 UtilityBufferSize = 12;
-
-// in dwords
-namespace UtilityBufferOffsets {
-static const u32 NextEmulatedWorkgroupIndex = 0;
-static const u32 LastCountedWorkgroup = 1;
-static const u32 GlobalCount = 2;
-} // namespace UtilityBufferOffsets
-
-namespace SharedMemStructIndices {
-static const u32 SubgroupCounts = 0;
-static const u32 ScratchVal = 1;
-} // namespace SharedMemStructIndices
-
 } // namespace OrderedCount
