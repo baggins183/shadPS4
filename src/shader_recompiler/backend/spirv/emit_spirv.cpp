@@ -353,11 +353,13 @@ void SetupCapabilities(const Info& info, const Profile& profile, const RuntimeIn
         ctx.AddExtension("SPV_KHR_physical_storage_buffer");
     }
     const auto shared_type_count = std::popcount(static_cast<u32>(info.shared_types));
-    if (shared_type_count > 1 && profile.supports_workgroup_explicit_memory_layout) {
-        // TODO refactor
+    if (info.UsesSharedMemoryBlocks(profile.supports_workgroup_explicit_memory_layout)) {
         ctx.AddExtension("SPV_KHR_workgroup_memory_explicit_layout");
         ctx.AddCapability(spv::Capability::WorkgroupMemoryExplicitLayoutKHR);
-        ctx.AddCapability(spv::Capability::WorkgroupMemoryExplicitLayout16BitAccessKHR);
+        if (shared_type_count > 1) {
+            // TODO Needs WorkgroupMemoryExplicitLayout8BitAccessKHR?
+            ctx.AddCapability(spv::Capability::WorkgroupMemoryExplicitLayout16BitAccessKHR);
+        }
     }
     if (info.uses_buffer_int64_atomics || info.uses_shared_int64_atomics) {
         if (info.uses_buffer_int64_atomics) {
@@ -373,11 +375,6 @@ void SetupCapabilities(const Info& info, const Profile& profile, const RuntimeIn
         ctx.AddCapability(spv::Capability::Int64Atomics);
     }
     if (info.UsesOrderedCount()) {
-        ctx.AddExtension("SPV_KHR_workgroup_memory_explicit_layout");
-        ctx.AddCapability(spv::Capability::WorkgroupMemoryExplicitLayoutKHR);
-        ctx.AddCapability(spv::Capability::GroupNonUniform);
-        ctx.AddCapability(spv::Capability::GroupNonUniformBallot);
-        ctx.AddCapability(spv::Capability::GroupNonUniformArithmetic);
         ctx.AddCapability(spv::Capability::Linkage);
     }
 }

@@ -46,7 +46,6 @@ void EmitContext::DefineOrderedCountFunctions() {
     const Id init_workgroup_id_func_type = TypeFunction(U32[1]);
     init_emulated_workgroup_index_function =
         OpFunction(U32[1], spv::FunctionControlMask::MaskNone, init_workgroup_id_func_type);
-    Name(init_emulated_workgroup_index_function, "init_emulated_workgroup_index");
     OpFunctionEnd();
 
     DecorateLinkage(init_emulated_workgroup_index_function, spv::LinkageType::Import,

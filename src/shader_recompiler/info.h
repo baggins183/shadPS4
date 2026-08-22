@@ -218,8 +218,11 @@ struct Info : InfoPersistent {
         return sizeof(u32) * (1 + 2 * num_ordered_count_packers);
     }
 
-    bool UsesSharedMemoryBlocks() const {
-        return std::popcount(static_cast<u32>(shared_types)) > 1 || UsesOrderedCount();
+    bool UsesSharedMemoryBlocks(bool profile_supports) const {
+        ASSERT_MSG(!(UsesOrderedCount() && !profile_supports),
+                   "ordered count requires SPV_KHR_workgroup_memory_explicit_layout for now");
+        return profile_supports &&
+               (std::popcount(static_cast<u32>(shared_types)) > 1 || UsesOrderedCount());
     }
 
     void Serialize(Serialization::Archive& ar) const;

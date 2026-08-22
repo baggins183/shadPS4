@@ -176,7 +176,7 @@ public:
     }
 
     Id EmitSharedMemoryAccess(const Id result_type, const Id shared_mem, const Id index) {
-        if (info.UsesSharedMemoryBlocks()) {
+        if (info.UsesSharedMemoryBlocks(profile.supports_workgroup_explicit_memory_layout)) {
             return OpAccessChain(result_type, shared_mem, u32_zero_value, index);
         }
         // Workgroup layout struct omitted.
