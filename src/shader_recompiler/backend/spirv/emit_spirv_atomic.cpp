@@ -25,6 +25,17 @@ Id SharedAtomicU32(EmitContext& ctx, Id offset, Id value,
     return (ctx.*atomic_func)(ctx.U32[1], pointer, scope, semantics, value);
 }
 
+Id SharedAtomicF32(EmitContext& ctx, Id offset, Id value,
+                   Id (Sirit::Module::*atomic_func)(Id, Id, Id, Id, Id)) {
+    const Id shift_id{ctx.ConstU32(2U)};
+    const Id index{ctx.OpShiftRightLogical(ctx.U32[1], offset, shift_id)};
+    const Id pointer{ctx.EmitSharedMemoryAccess(ctx.shared_f32, ctx.shared_memory_f32, index)};
+    const auto [scope, semantics]{AtomicArgs(ctx)};
+    const Id float_val = ctx.OpBitcast(ctx.F32[1], value);
+    const Id old_value = (ctx.*atomic_func)(ctx.F32[1], pointer, scope, semantics, float_val);
+    return ctx.OpBitcast(ctx.U32[1], old_value);
+}
+
 Id SharedAtomicU32IncDec(EmitContext& ctx, Id offset,
                          Id (Sirit::Module::*atomic_func)(Id, Id, Id, Id)) {
     const Id shift_id{ctx.ConstU32(2U)};
@@ -215,6 +226,14 @@ Id EmitSharedAtomicDec32(EmitContext& ctx, Id offset) {
 
 Id EmitSharedAtomicDec64(EmitContext& ctx, Id offset) {
     return SharedAtomicU64IncDec(ctx, offset, &Sirit::Module::OpAtomicIDecrement);
+}
+
+Id EmitSharedAtomicFmin32(EmitContext& ctx, Id offset, Id value) {
+    return SharedAtomicF32(ctx, offset, value, &Sirit::Module::OpAtomicFMin);
+}
+
+Id EmitSharedAtomicFmax32(EmitContext& ctx, Id offset, Id value) {
+    return SharedAtomicF32(ctx, offset, value, &Sirit::Module::OpAtomicFMax);
 }
 
 Id EmitBufferAtomicIAdd32(EmitContext& ctx, IR::Inst* inst, u32 handle, Id address, Id value) {

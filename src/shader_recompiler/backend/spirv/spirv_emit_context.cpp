@@ -73,9 +73,13 @@ EmitContext::EmitContext(const Profile& profile_, const RuntimeInfo& runtime_inf
     : Sirit::Module(profile_.supported_spirv), info{info_}, runtime_info{runtime_info_},
       profile{profile_}, stage{info.stage}, l_stage{info.l_stage}, binding{binding_} {
     if (info.uses_dma) {
-        SetMemoryModel(spv::AddressingModel::PhysicalStorageBuffer64, spv::MemoryModel::GLSL450);
+        AddCapability(spv::Capability::VulkanMemoryModel);
+        // SetMemoryModel(spv::AddressingModel::PhysicalStorageBuffer64, spv::MemoryModel::GLSL450);
+        SetMemoryModel(spv::AddressingModel::PhysicalStorageBuffer64, spv::MemoryModel::Vulkan);
     } else {
-        SetMemoryModel(spv::AddressingModel::Logical, spv::MemoryModel::GLSL450);
+        AddCapability(spv::Capability::VulkanMemoryModel);
+        // SetMemoryModel(spv::AddressingModel::Logical, spv::MemoryModel::GLSL450);
+        SetMemoryModel(spv::AddressingModel::Logical, spv::MemoryModel::Vulkan);
     }
     String(fmt::format("{:#x}", info.pgm_hash));
 
@@ -315,13 +319,6 @@ void EmitContext::DefineInputs() {
             U32[1], spv::BuiltIn::SubgroupLocalInvocationId, spv::StorageClass::Input);
         Decorate(subgroup_local_invocation_id, spv::Decoration::Flat); // TODO Flat?
     }
-    if (info.UsesOrderedCount()) {
-        subgroup_id = DefineVariable(U32[1], spv::BuiltIn::SubgroupId, spv::StorageClass::Input);
-        num_subgroups =
-            DefineVariable(U32[1], spv::BuiltIn::NumSubgroups, spv::StorageClass::Input);
-        local_invocation_index =
-            DefineVariable(U32[1], spv::BuiltIn::LocalInvocationIndex, spv::StorageClass::Input);
-    }
     if (info.loads.GetAny(IR::Attribute::SubgroupLtMask)) {
         subgroup_lt_mask =
             DefineVariable(U32[4], spv::BuiltIn::SubgroupLtMask, spv::StorageClass::Input);
@@ -483,7 +480,8 @@ void EmitContext::DefineInputs() {
                 DefineVariable(U32[3], spv::BuiltIn::LocalInvocationId, spv::StorageClass::Input);
         }
         if (info.loads.Get(IR::Attribute::LocalInvocationIndex)) {
-            local_invocation_index = DefineVariable(U32[1], spv::BuiltIn::LocalInvocationIndex, spv::StorageClass::Input);
+            local_invocation_index = DefineVariable(U32[1], spv::BuiltIn::LocalInvocationIndex,
+                                                    spv::StorageClass::Input);
         }
         break;
     case LogicalStage::Geometry: {
@@ -1094,6 +1092,8 @@ void EmitContext::DefineSharedMemory() {
         make_type(IR::Type::U32, U32[1], 4u, "shared_mem_u32");
     std::tie(shared_memory_u64, shared_u64, shared_memory_u64_type) =
         make_type(IR::Type::U64, U64, 8u, "shared_mem_u64");
+    std::tie(shared_memory_f32, shared_f32, shared_memory_f32_type) =
+        make_type(IR::Type::F32, F32[1], 8u, "shared_mem_f32");
 
     // For now, only one scenario where we need scratch memory (shader has DS_ORDERED_COUNT)
     if (info.UsesOrderedCount()) {

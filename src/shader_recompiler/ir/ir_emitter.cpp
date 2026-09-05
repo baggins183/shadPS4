@@ -348,6 +348,14 @@ U32U64 IREmitter::SharedAtomicIMax(const U32& address, const U32U64& data, bool 
     }
 }
 
+U32U64 IREmitter::SharedAtomicFMin(const U32& address, const U32U64& data, bool is_gds) {
+    return Inst<U32>(Opcode::SharedAtomicFmin32, Flags{is_gds}, address, data);
+}
+
+U32U64 IREmitter::SharedAtomicFMax(const U32& address, const U32U64& data, bool is_gds) {
+    return Inst<U32>(Opcode::SharedAtomicFmax32, Flags{is_gds}, address, data);
+}
+
 U32U64 IREmitter::SharedAtomicAnd(const U32& address, const U32U64& data, bool is_gds) {
     switch (data.Type()) {
     case Type::U32:
@@ -1598,6 +1606,11 @@ U32U64 IREmitter::BitwiseXor(const U32U64& a, const U32U64& b) {
 U32 IREmitter::BitFieldInsert(const U32& base, const U32& insert, const U32& offset,
                               const U32& count) {
     return Inst<U32>(Opcode::BitFieldInsert, base, insert, offset, count);
+}
+
+U64 IREmitter::BitFieldInsert64(const U64& base, const U64& insert, const U32& offset,
+                                const U32& count) {
+    return Inst<U64>(Opcode::BitFieldInsert64, base, insert, offset, count);
 }
 
 U32 IREmitter::BitFieldExtract(const U32& base, const U32& offset, const U32& count,

@@ -108,6 +108,9 @@ public:
     [[nodiscard]] U32U64 SharedAtomicOr(const U32& address, const U32U64& data, bool is_gds);
     [[nodiscard]] U32U64 SharedAtomicXor(const U32& address, const U32U64& data, bool is_gds);
 
+    [[nodiscard]] U32U64 SharedAtomicFMin(const U32& address, const U32U64& data, bool is_gds);
+    [[nodiscard]] U32U64 SharedAtomicFMax(const U32& address, const U32U64& data, bool is_gds);
+
     template <typename T = U32>
     [[nodiscard]] T SharedAtomicInc(const U32& address, bool is_gds);
     template <typename T = U32>
@@ -284,6 +287,9 @@ public:
     [[nodiscard]] U32U64 BitwiseXor(const U32U64& a, const U32U64& b);
     [[nodiscard]] U32 BitFieldInsert(const U32& base, const U32& insert, const U32& offset,
                                      const U32& count);
+    // TODO refactor
+    [[nodiscard]] U64 BitFieldInsert64(const U64& base, const U64& insert, const U32& offset,
+                                       const U32& count);
     [[nodiscard]] U32 BitFieldExtract(const U32& base, const U32& offset, const U32& count,
                                       bool is_signed = false);
     [[nodiscard]] U32 BitReverse(const U32& value);

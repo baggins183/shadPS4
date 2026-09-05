@@ -146,6 +146,7 @@ struct Info : InfoPersistent {
     bool uses_unpack_10_11_11{};
     bool uses_buffer_int64_atomics{};
     bool uses_shared_int64_atomics{};
+    bool uses_shared_f32_atomics{};
     bool stores_tess_level_outer{};
     bool stores_tess_level_inner{};
     u32 num_ordered_count_packers{};

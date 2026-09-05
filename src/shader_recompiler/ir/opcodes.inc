@@ -59,6 +59,8 @@ OPCODE(SharedAtomicOr32,                                    U32,            U32,
 OPCODE(SharedAtomicOr64,                                    U64,            U32,            U64,                                                            )
 OPCODE(SharedAtomicXor32,                                   U32,            U32,            U32,                                                            )
 OPCODE(SharedAtomicXor64,                                   U64,            U32,            U64,                                                            )
+OPCODE(SharedAtomicFmin32,                                  U32,            U32,            U32,                                                            )
+OPCODE(SharedAtomicFmax32,                                  U32,            U32,            U32,                                                            )
 
 // Context getters/setters
 OPCODE(GetUserData,                                         U32,            ScalarReg,                                                                      )
@@ -339,6 +341,7 @@ OPCODE(BitwiseOr64,                                         U64,            U64,
 OPCODE(BitwiseXor32,                                        U32,            U32,            U32,                                                            )
 OPCODE(BitwiseXor64,                                        U64,            U64,            U64,                                                            )
 OPCODE(BitFieldInsert,                                      U32,            U32,            U32,            U32,            U32,                            )
+OPCODE(BitFieldInsert64,                                    U64,            U64,            U64,            U32,            U32,                            )
 OPCODE(BitFieldSExtract,                                    U32,            U32,            U32,            U32,                                            )
 OPCODE(BitFieldUExtract,                                    U32,            U32,            U32,            U32,                                            )
 OPCODE(BitReverse32,                                        U32,            U32,                                                                            )

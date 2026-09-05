@@ -84,7 +84,7 @@ void wave_barrier_subgroup32() {
                                                         gl_ScopeWorkgroup,
                                                         gl_StorageSemanticsShared,
                                                         gl_SemanticsVolatile | gl_SemanticsRelease,
-                                                        gl_StorageSemanticsShared,
+                                                        gl_StorageSemanticsNone,
                                                         gl_SemanticsVolatile | gl_SemanticsRelaxed)) {  // TODO what is point of semequal???
                 break;
             }
@@ -166,6 +166,34 @@ uint readfirstlane_generic(uint value, bool is_active) {
         // assume 64
         uint lane = subgroupAny(is_active) ? subgroupBallotFindLSB(subgroupBallot(is_active)) : 0;
         return subgroupBroadcast(value, lane);
+    }
+}
+
+uvec2 wave_ballot_subgroup32_workgroupsync(bool value) {
+    const uint wave_id = get_wave_id();
+    const uint subgroup_in_wave = gl_SubgroupID & 1;
+    const bool is_bottom = subgroup_in_wave == 0;
+
+    const uint my_ballot = subgroupBallot(value).x;
+    warp_mem[subgroup_in_wave].a[wave_id] = my_ballot;
+    barrier();
+    const uint other_ballot = warp_mem[subgroup_in_wave ^ 1].a[wave_id];
+    barrier();
+
+    return is_bottom ? uvec2(my_ballot, other_ballot) : uvec2(other_ballot, my_ballot);
+}
+
+// TODO let IR decide this
+uvec2 wave_ballot_generic(bool value) {
+    if (gl_SubgroupSize == 32) {
+#if 0
+        return wave_ballot_subgroup32(value);
+#else
+        return wave_ballot_subgroup32_workgroupsync(value);
+#endif
+    } else {
+        // assume 64
+        return subgroupBallot(value).xy;
     }
 }
 

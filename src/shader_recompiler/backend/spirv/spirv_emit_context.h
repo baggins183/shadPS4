@@ -235,6 +235,7 @@ public:
     Id shared_u16{};
     Id shared_u32{};
     Id shared_u64{};
+    Id shared_f32{};
 
     Id input_u32{};
     Id input_f32{};
@@ -278,9 +279,6 @@ public:
     Id local_invocation_index{};
     Id invocation_id{};
     Id subgroup_local_invocation_id{};
-    Id subgroup_id{};
-    Id num_subgroups{};
-    Id local_invocation_index{};
     Id subgroup_lt_mask{};
     Id image_u32{};
     Id image_f32{};
@@ -288,10 +286,12 @@ public:
     Id shared_memory_u16{};
     Id shared_memory_u32{};
     Id shared_memory_u64{};
+    Id shared_memory_f32{};
 
     Id shared_memory_u16_type{};
     Id shared_memory_u32_type{};
     Id shared_memory_u64_type{};
+    Id shared_memory_f32_type{};
 
     Id bary_coord{};
     Id bary_coord_smooth{};

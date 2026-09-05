@@ -55,6 +55,13 @@ void Visit(Info& info, const IR::Inst& inst) {
     case IR::Opcode::SharedAtomicXor32:
         info.shared_types |= IR::Type::U32;
         break;
+    case IR::Opcode::SharedAtomicFmin32:
+    case IR::Opcode::SharedAtomicFmax32:
+        // TODO
+        info.shared_types |= IR::Type::F32;
+        info.uses_shared_f32_atomics = true;
+        break;
+
     case IR::Opcode::SharedAtomicIAdd64:
     case IR::Opcode::SharedAtomicISub64:
     case IR::Opcode::SharedAtomicSMin64:
@@ -193,7 +200,6 @@ void CollectShaderInfoPass(IR::Program& program, const Profile& profile) {
     if (info.UsesOrderedCount()) {
         info.buffers.push_back({
             .used_types = IR::Type::U32,
-            .inline_cbuf = AmdGpu::Buffer::Placeholder(std::numeric_limits<u32>::max()),
             .buffer_type = BufferType::OrderedCountUtility,
             .is_written = true,
         });

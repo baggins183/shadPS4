@@ -82,6 +82,10 @@ void Translator::EmitDataShare(const GcnInst& inst) {
         return DS_READ(64, false, true, false, inst);
     case Opcode::DS_READ2ST64_B64:
         return DS_READ(64, false, true, true, inst);
+    case Opcode::DS_MIN_F32:
+        return DS_OP(inst, AtomicOp::Fmin, false);
+    case Opcode::DS_MAX_F32:
+        return DS_OP(inst, AtomicOp::Fmax, false);
     case Opcode::DS_ORDERED_COUNT:
         return DS_ORDERED_COUNT(inst);
     default:
@@ -154,6 +158,10 @@ void Translator::DS_OP(const GcnInst& inst, AtomicOp op, bool rtn) {
             return ir.SharedAtomicInc<T>(addr_offset, is_gds);
         case AtomicOp::Dec:
             return ir.SharedAtomicDec<T>(addr_offset, is_gds);
+        case AtomicOp::Fmin:
+            return ir.SharedAtomicFMin(addr_offset, data, is_gds);
+        case AtomicOp::Fmax:
+            return ir.SharedAtomicFMax(addr_offset, data, is_gds);
         default:
             UNREACHABLE();
         }

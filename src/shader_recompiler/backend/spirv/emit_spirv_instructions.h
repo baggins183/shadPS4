@@ -164,6 +164,8 @@ Id EmitSharedAtomicDec32(EmitContext& ctx, Id offset);
 Id EmitSharedAtomicDec64(EmitContext& ctx, Id offset);
 Id EmitSharedAtomicISub32(EmitContext& ctx, Id offset, Id value);
 Id EmitSharedAtomicISub64(EmitContext& ctx, Id offset, Id value);
+Id EmitSharedAtomicFmin32(EmitContext& ctx, Id offset, Id value);
+Id EmitSharedAtomicFmax32(EmitContext& ctx, Id offset, Id value);
 
 Id EmitCompositeConstructU32x2(EmitContext& ctx, IR::Inst* inst, Id e1, Id e2);
 Id EmitCompositeConstructU32x3(EmitContext& ctx, IR::Inst* inst, Id e1, Id e2, Id e3);
@@ -341,6 +343,7 @@ Id EmitBitwiseOr64(EmitContext& ctx, IR::Inst* inst, Id a, Id b);
 Id EmitBitwiseXor32(EmitContext& ctx, IR::Inst* inst, Id a, Id b);
 Id EmitBitwiseXor64(EmitContext& ctx, IR::Inst* inst, Id a, Id b);
 Id EmitBitFieldInsert(EmitContext& ctx, Id base, Id insert, Id offset, Id count);
+Id EmitBitFieldInsert64(EmitContext& ctx, Id base, Id insert, Id offset, Id count);
 Id EmitBitFieldSExtract(EmitContext& ctx, IR::Inst* inst, Id base, Id offset, Id count);
 Id EmitBitFieldUExtract(EmitContext& ctx, IR::Inst* inst, Id base, Id offset, Id count);
 Id EmitBitReverse32(EmitContext& ctx, Id value);

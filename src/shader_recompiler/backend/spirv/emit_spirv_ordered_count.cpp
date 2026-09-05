@@ -48,7 +48,7 @@ void EmitContext::DefineOrderedCountFunctions() {
         OpFunction(U32[1], spv::FunctionControlMask::MaskNone, ordered_count_func_type);
     OpFunctionEnd();
     DecorateLinkage(ordered_count_add_per_workgroup_function, spv::LinkageType::Import,
-                    "ordered_count_add_per_workgroup");
+                    "ordered_count_add_workgroupsync");
 
     ordered_count_swap_function =
         OpFunction(U32[1], spv::FunctionControlMask::MaskNone, ordered_count_func_type);
