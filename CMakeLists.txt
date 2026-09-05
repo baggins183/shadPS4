@@ -1011,6 +1011,8 @@ set(SHADER_RECOMPILER src/shader_recompiler/profile.h
                       src/shader_recompiler/frontend/copy_shader.h
                       src/shader_recompiler/frontend/decode.cpp
                       src/shader_recompiler/frontend/decode.h
+                      src/shader_recompiler/frontend/dominance.cpp
+                      src/shader_recompiler/frontend/dominance.h
                       src/shader_recompiler/frontend/fetch_shader.cpp
                       src/shader_recompiler/frontend/fetch_shader.h
                       src/shader_recompiler/frontend/format.cpp
@@ -1052,6 +1054,7 @@ set(SHADER_RECOMPILER src/shader_recompiler/profile.h
                       src/shader_recompiler/ir/dominance.h
                       src/shader_recompiler/ir/ir_emitter.cpp
                       src/shader_recompiler/ir/ir_emitter.h
+                      src/shader_recompiler/ir/dominance_search.h
                       src/shader_recompiler/ir/microinstruction.cpp
                       src/shader_recompiler/ir/microinstruction.h
                       src/shader_recompiler/ir/opcodes.cpp
