@@ -683,7 +683,7 @@ std::vector<u32> LinkSPIRV(EmitContext& ctx, const Profile& profile,
             std::vector<u32> ordered_count_spirv = Vulkan::CompileSpvLibrary(
                 HostShaders::ORDERED_COUNT_COMP, vk::ShaderStageFlagBits::eCompute,
                 {
-                    fmt::format("MAX_NUM_SUBGROUPS={}", ctx.max_num_subgroups),
+                    fmt::format("MAX_NUM_WAVES={}", ctx.max_num_waves),
                     fmt::format("UTILITY_BUFFER_BINDING={}",
                                 ctx.ordered_count_utility_buffer_binding),
                     fmt::format("SHARED_MEMORY_BASE_OFFSET={}", ctx.shared_mem_ordered_count_base),
@@ -698,6 +698,7 @@ std::vector<u32> LinkSPIRV(EmitContext& ctx, const Profile& profile,
         spv_link_options.SetResolveAddressingModelMismatch(true);
         // Allow mismatches where, for example, caller passes a uint and callee expects a function
         // pointer to uint (glslang's convention)
+        // (kind of a hack)
         spv_link_options.SetAllowRValueLValueMismatch(true);
         // TODO fix spirv link to add aliased to shared mem blocks when >1
 

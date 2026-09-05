@@ -394,12 +394,13 @@ public:
 
     // Ordered count stuff
     Id init_emulated_workgroup_index_function{};
-    Id ordered_count_add_function{};
+    Id ordered_count_add_per_wave_function{};
+    Id ordered_count_add_per_workgroup_function{};
     Id ordered_count_swap_function{};
 
     Id emulated_workgroup_id_id{};
     Id ordered_count_shared_mem_variable{};
-    u32 max_num_subgroups{};
+    u32 max_num_waves{};
     Id ordered_count_subgroup_counts_array_type{};
 
     u32 ordered_count_utility_buffer_binding{};

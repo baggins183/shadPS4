@@ -1093,10 +1093,12 @@ void EmitContext::DefineSharedMemory() {
             threadgroup_dims[0] * threadgroup_dims[1] * threadgroup_dims[2];
         // TODO: this is potentially innacurate, may need to be conservative or mess with
         // VK_EXT_subgroup_size_control
-        max_num_subgroups = Common::DivCeil(threadgroup_size, profile.subgroup_size);
+        // max_num_waves = Common::DivCeil(threadgroup_size, profile.subgroup_size);
+        max_num_waves = Common::DivCeil(threadgroup_size, 64u);
 
         shared_mem_ordered_count_base = Common::AlignUp(shared_mem_total_size, 32 /*TODO*/);
-        u32 shared_mem_ordered_count_size = 4 * max_num_subgroups + 4;
+        // u32 shared_mem_ordered_count_size = 4 * max_num_waves + 4;       // TODO
+        const u32 shared_mem_ordered_count_size = (4 * max_num_waves * 7) + 4; // TODO
         shared_mem_total_size = shared_mem_ordered_count_base + shared_mem_ordered_count_size;
     }
 

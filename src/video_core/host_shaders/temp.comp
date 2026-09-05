@@ -13,25 +13,32 @@
 #extension GL_EXT_shader_atomic_int64 : require
 #extension GL_KHR_shader_subgroup_vote : require
 
-struct WarpMem {
-    uint a[MAX_NUM_WAVES];
-    uint b[MAX_NUM_WAVES];
-};
-
 layout(std430) shared shared_mem_ordered_count
 {
     layout (offset = SHARED_MEMORY_BASE_OFFSET)
     uint wave_counts[MAX_NUM_WAVES];
+    uint scratch_val;
+
+    // TODO refactor all this so separate ops can reuse same variables
+    // and reduce shared mem
+
+    // also untangle ordered_count from other emulated wave ops
+    // (It would be nice to declare extern/import functions in GLSL)
+
+    shared uint readlane_workgroupsync_mem[MAX_NUM_WAVES];
+
+    // used by 
+    shared uint64_t readlane_mem[MAX_NUM_WAVES];
+
+    // used by readfirstlane/ballot for 2 subgroups to send
+    // eachother values
+    shared uint64_t communication_mem_u64[MAX_NUM_WAVES];
 
     // used by barrier
     shared uint communication_mem_u32[MAX_NUM_WAVES];
 
     // used by readfirstlane/ballot/barrier to synchronize
     shared uint barrier_mem[MAX_NUM_WAVES];
-
-    shared WarpMem warp_mem[2];
-
-    uint scratch_val;
 };
 
 struct Counter {
@@ -48,15 +55,6 @@ layout(std430, set = 0, binding = UTILITY_BUFFER_BINDING) buffer ordered_count_u
 
 void init_shared_mem() {
     // TODO
-    if (gl_LocalInvocationIndex < MAX_NUM_WAVES) {
-        communication_mem_u32[gl_LocalInvocationIndex] = 0;
-        barrier_mem[gl_LocalInvocationIndex] = 0;
-
-        warp_mem[0].a[gl_LocalInvocationIndex] = 0;
-        warp_mem[0].b[gl_LocalInvocationIndex] = 0;
-        warp_mem[1].a[gl_LocalInvocationIndex] = 0;
-        warp_mem[1].b[gl_LocalInvocationIndex] = 0;
-    }
 }
 
 uint get_wave_id() {
@@ -65,6 +63,61 @@ uint get_wave_id() {
 
 uint get_lane_id() {
     return gl_LocalInvocationIndex % 64;
+}
+
+uint readlane_subgroup32_workgroupsync(uint value, uint lane) {
+    uint wave_id = get_wave_id();
+    uint rval;
+
+    if (get_lane_id() == lane) {
+        readlane_workgroupsync_mem[wave_id] = value;
+    }
+    barrier();
+    rval = readlane_workgroupsync_mem[wave_id];
+    // Can get rid of 2nd barrier by alternating between 2 shared mem locations
+    barrier();
+
+    return rval;
+}
+
+uint readlane_subgroup32(uint value, uint lane) {
+    const uint64_t placeholder = 0xffffffff00000000UL;
+    uint wave_id = get_wave_id();
+    uint rval;
+
+    if (gl_SubgroupInvocationID == lane % 32) {
+        if ((lane / 32) == (gl_SubgroupID & 1)) {
+            uint64_t storeval = uint64_t(uvec2(value, 0));
+            for (;;) {
+                if (placeholder == atomicCompSwap(readlane_mem[wave_id], placeholder, storeval,
+                                                            gl_ScopeWorkgroup,
+                                                            gl_StorageSemanticsShared,
+                                                            gl_SemanticsVolatile | gl_SemanticsRelaxed,
+                                                            gl_StorageSemanticsShared,
+                                                            gl_SemanticsVolatile | gl_SemanticsRelaxed)) {  // ???
+                    break;
+                }
+            }
+            rval = value;
+        } else {
+            for (;;) {
+                uvec2 result = uvec2(atomicMax(readlane_mem[wave_id], placeholder,
+                                                            gl_ScopeWorkgroup,
+                                                            gl_StorageSemanticsShared,
+                                                            gl_SemanticsVolatile | gl_SemanticsRelaxed));
+                if (result.y == 0) {
+                    rval = result.x;
+                    break;
+                }
+            }
+        }
+    }
+    return subgroupBroadcast(rval, lane % 32);
+}
+
+uint readfirstlane_subgroup32_workgroupsync(uint value, bool is_active) {
+    // TODO
+    return 0;
 }
 
 void wave_barrier_subgroup32() {
@@ -92,95 +145,138 @@ void wave_barrier_subgroup32() {
     }
 }
 
-bool elect_subgroup32_workgroupsync(bool is_active) {
-    const uint wave_id = get_wave_id();
-    const bool any = subgroupAny(is_active);
-    const bool is_warp_0 = (gl_SubgroupID & 1) == 0;
+// Lets warps A/B know who is first to arrive
+const uint PARITY_TAG = 1 << 0;
+// Tell other warp that this one has an active thread
+const uint HAS_VALUE_TAG = 1 << 1;
 
-    bool elected = is_active && subgroupElect();
+uint prev_tag;
+uint prev_value;
 
-    if (is_warp_0 && subgroupElect()) {
-        warp_mem[0].a[wave_id] = any ? 1 : 0;
+// share uint with other subgroup (size 32) in a wave
+// return value: other subgroup's value (.x) and "tags" (.y)
+// e.g. HAS_VALUE_TAG is relevant for readfirstlane
+uvec2 communicate_uints_subgroup32(uint my_value, bool has_value) {
+    uint result_tags, result_value, other_tags, other_value;
+
+    uint wave_id = gl_SubgroupID / 2;
+    uint my_tags = PARITY_TAG;
+    if (has_value) {
+        my_tags |= HAS_VALUE_TAG;
     }
-    barrier();
-    if (!is_warp_0 && elected) {
-        elected = warp_mem[0].a[wave_id] == 0;
-    }
-    barrier();
-
-    return elected;
-}
-
-// TODO let IR decide this
-bool elect_generic(bool is_active) {
-    if (gl_SubgroupSize == 32) {
-#if 0
-        return elect_subgroup32(is_active);
-#else
-        return elect_subgroup32_workgroupsync(is_active);
-#endif
-    } else {
-        // assume 64
-        return is_active && subgroupElect();
-    }
-}
-
-uint readfirstlane_subgroup32_workgroupsync(uint value, bool is_active) {
-    const uint wave_id = get_wave_id();
-    const bool any = subgroupAny(is_active);
-    const uint lane = any ? subgroupBallotFindLSB(subgroupBallot(is_active)) : 0;
-    const bool elected = gl_SubgroupInvocationID == lane;
-    const uint subgroup_in_wave = gl_SubgroupID & 1;
-    const bool is_bottom = subgroup_in_wave == 0;
 
     uint rval;
 
-    if (elected) {
-        warp_mem[subgroup_in_wave].a[wave_id] = value;
-        warp_mem[subgroup_in_wave].b[wave_id] = is_active ? 1 : 0;
+    uint64_t xor_arg = uint64_t(uvec2(my_tags, my_value));
+    uvec2 result = uvec2(atomicXor(communication_mem_u64[wave_id], xor_arg, 
+                                                                gl_ScopeWorkgroup,
+                                                                gl_StorageSemanticsShared,
+                                                                gl_SemanticsAcquireRelease));
+    result_tags = result.x;
+    result_value = result.y;
+    bool first = (result_tags & PARITY_TAG) != 0;
+
+    if (first) {
+        for (;;) {
+            result = uvec2(atomicLoad(communication_mem_u64[wave_id],
+                                                                gl_ScopeWorkgroup,
+                                                                gl_StorageSemanticsShared,
+                                                                gl_SemanticsVolatile));
+            uint result_tags = result.x;
+            uint result_value = result.y;
+            if ((result_tags & PARITY_TAG) == 0) {
+                break;
+            }
+        }
+
+        atomicStore(barrier_mem[wave_id], 1u,
+                                                gl_ScopeWorkgroup,
+                                                gl_StorageSemanticsShared,
+                                                gl_SemanticsRelease);
+
+        other_tags = result_tags ^ prev_tag ^ my_tags;
+        other_value = result_value ^ prev_value ^ my_value;
+
+        prev_tag = result_tags;
+        prev_value = result_value;
+    } else {
+        other_tags = result_tags ^ prev_tag;
+        other_value = result_value ^ prev_value;
+
+        prev_tag = result_tags ^ my_tags;
+        prev_value = result_value ^ my_value;
+
+        for (;;) {
+            if (1u == atomicCompSwap(barrier_mem[wave_id], 1u, 0u,
+                                                        gl_ScopeWorkgroup,
+                                                        gl_StorageSemanticsShared,
+                                                        gl_SemanticsVolatile | gl_SemanticsRelease,
+                                                        gl_StorageSemanticsShared,
+                                                        gl_SemanticsVolatile | gl_SemanticsRelaxed)) {  // TODO what is point of semequal???
+                break;
+            }
+        }
     }
-    barrier();
-    if (elected) {
-        const uint other_value = warp_mem[subgroup_in_wave ^ 1].a[wave_id];
-        const bool other_active = warp_mem[subgroup_in_wave ^ 1].b[wave_id] == 1;
-        if (is_bottom) {
+
+    return uvec2(other_value, other_tags);
+}
+
+uint readfirstlane_subgroup32(uint value, bool is_active) {
+    bool bottom = gl_SubgroupID % 2 == 0;
+    uint elected_invocation = subgroupAny(is_active) ? subgroupBallotFindLSB(subgroupBallot(is_active)) : 0;
+
+    uint rval;
+    if (gl_SubgroupInvocationID == elected_invocation) {
+        uvec2 other_result = communicate_uints_subgroup32(value, is_active);
+
+        uint other_value = other_result.x;
+        uint other_tags = other_result.y;
+        bool other_active = (other_tags & HAS_VALUE_TAG) != 0;
+
+        if (bottom) {
             rval = (is_active || !other_active) ? value : other_value;
         } else {
             rval = (is_active && !other_active) ? value : other_value;
         }
     }
-    barrier();
-
-    return subgroupBroadcast(rval, lane);
+    return subgroupBroadcast(rval, elected_invocation);
 }
 
 // TODO let IR decide this
 uint readfirstlane_generic(uint value, bool is_active) {
     if (gl_SubgroupSize == 32) {
-#if 0
         return readfirstlane_subgroup32(value, is_active);
-#else
-        return readfirstlane_subgroup32_workgroupsync(value, is_active);
-#endif
-    } else {
-        // assume 64
-        uint lane = subgroupAny(is_active) ? subgroupBallotFindLSB(subgroupBallot(is_active)) : 0;
-        return subgroupBroadcast(value, lane);
     }
+    uint lane = subgroupBallotFindLSB(subgroupBallot(is_active));
+    return subgroupBroadcast(value, lane);
 }
 
-// Grab a workgroup index by bumping a counter used by all dispatched workgroups.
+uvec2 ballot_subgroup32(bool value) {
+    uint our_mask = subgroupBallot(value).x;
+    uint other_mask;
+    if (gl_SubgroupInvocationID == 0) {
+        other_mask = communicate_uints_subgroup32(our_mask, true).x;
+    }
+    other_mask = subgroupBroadcast(other_mask, 0);
+    return uvec2(our_mask, other_mask);
+}
+
+// TODO let IR decide this
+bool elect_generic(bool is_active) {
+    if (gl_SubgroupSize == 32) {
+        return elect_subgroup32(is_active);
+    }
+    return is_active && subgroupElect();
+}
+
+// Grab a workgroup index by bumping a counter "next_emulated_workgroup_index"
+// used by all dispatched workgroups.
 // This is to guarantee forward progress in a shader that uses DS_ORDERED_COUNT,
 // because workgroups aren't dispatched in particular order according to the actual
 // gl_WorkgroupId, but each workgroup must wait for all lower-numbered ones to be counted.
-// Could break in theory if workgroups can be unscheduled until higher numbered finishes
-// ie deadlock
+// This may not be enough in theory if workgroups can be unscheduled, blocking on
+// progress of others, after they've started executing.
 uint init_emulated_workgroup_index() {
-#if 1
-    // TODO call from main
-    init_shared_mem();
-#endif
-
     if (gl_LocalInvocationIndex == 0) {
         scratch_val = atomicAdd(next_emulated_workgroup_index, 1);
     }

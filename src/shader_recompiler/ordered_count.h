@@ -21,11 +21,16 @@ enum class Op : u32 {
 };
 
 union Flags {
+    // (offset1 << 8) | offset0
     BitField<2, 6, u32> packer_id;
     BitField<8, 1, u32> wave_release;
     BitField<9, 1, u32> wave_done;
     BitField<10, 2, ShaderType> shader_type;
     BitField<12, 2, Op> instruction_type;
+
+    // Flags invented by us
+    BitField<16, 1, u32> can_reconverge_workgroup;
+
     u32 raw;
 };
 

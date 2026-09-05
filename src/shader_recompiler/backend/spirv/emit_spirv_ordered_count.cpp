@@ -28,39 +28,46 @@ void EmitContext::InitEmulatedWorkgroupId() {
 }
 
 void EmitContext::DefineOrderedCountFunctions() {
+    const Id init_emulated_workgroup_index_func_type = TypeFunction(U32[1]);
+    init_emulated_workgroup_index_function = OpFunction(U32[1], spv::FunctionControlMask::MaskNone,
+                                                        init_emulated_workgroup_index_func_type);
+    OpFunctionEnd();
+    DecorateLinkage(init_emulated_workgroup_index_function, spv::LinkageType::Import,
+                    "init_emulated_workgroup_index");
+
     const Id ordered_count_func_type{TypeFunction(U32[1], U32[1], U32[1], U32[1], U1[1])};
 
-    ordered_count_add_function =
+    ordered_count_add_per_wave_function =
         OpFunction(U32[1], spv::FunctionControlMask::MaskNone, ordered_count_func_type);
-    // DecorateLinkage(ordered_count_function, spv::LinkageType::Import, "ordered_count");
-    DecorateLinkage(ordered_count_add_function, spv::LinkageType::Import,
-                    "ordered_count_one_thread");
     OpFunctionEnd();
+    DecorateLinkage(ordered_count_add_per_wave_function, spv::LinkageType::Import,
+                    "ordered_count_add_per_wave");
+
+    ordered_count_add_per_workgroup_function =
+        OpFunction(U32[1], spv::FunctionControlMask::MaskNone, ordered_count_func_type);
+    OpFunctionEnd();
+    DecorateLinkage(ordered_count_add_per_workgroup_function, spv::LinkageType::Import,
+                    "ordered_count_add_per_workgroup");
 
     ordered_count_swap_function =
         OpFunction(U32[1], spv::FunctionControlMask::MaskNone, ordered_count_func_type);
+    OpFunctionEnd();
     DecorateLinkage(ordered_count_swap_function, spv::LinkageType::Import,
-                    "ordered_count_swap_one_thread");
-    OpFunctionEnd();
-
-    const Id init_workgroup_id_func_type = TypeFunction(U32[1]);
-    init_emulated_workgroup_index_function =
-        OpFunction(U32[1], spv::FunctionControlMask::MaskNone, init_workgroup_id_func_type);
-    OpFunctionEnd();
-
-    DecorateLinkage(init_emulated_workgroup_index_function, spv::LinkageType::Import,
-                    "init_emulated_workgroup_index");
+                    "ordered_count_swap_per_wave");
 }
 
 Id EmitOrderedCount(EmitContext& ctx, IR::Inst* inst, u32 packer_id, Id value, Id is_active) {
-    auto flags = inst->Flags<OrderedCount::Flags>();
+    const auto flags = inst->Flags<OrderedCount::Flags>();
+    const bool can_reconverge_workgroup = flags.can_reconverge_workgroup.Value();
 
     ASSERT(flags.wave_release.Value());
 
     Id function;
     switch (flags.instruction_type.Value()) {
     case OrderedCount::Op::Add:
-        function = ctx.ordered_count_add_function;
+        // function = can_reconverge_workgroup ? ctx.ordered_count_add_per_workgroup_function :
+        // ctx.ordered_count_add_per_wave_function;
+        function = ctx.ordered_count_add_per_workgroup_function;
         break;
     case OrderedCount::Op::Swap:
         function = ctx.ordered_count_swap_function;
