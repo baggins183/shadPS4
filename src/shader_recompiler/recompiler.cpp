@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: Copyright 2024 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include <limits>
 #include "common/logging/classes.h"
 #pragma clang optimize off
 #include <unordered_map>
@@ -135,6 +136,238 @@ void LowerLdsSpillsToRegistersPass(IR::Program& program, const RuntimeInfo& runt
     Shader::Optimization::SsaRewritePass(program);
 }
 
+static bool IsCompositeExtract(IR::Inst* const inst) {
+    switch (inst->GetOpcode()) {
+    case IR::Opcode::CompositeExtractU32x2:
+    case IR::Opcode::CompositeExtractU32x3:
+    case IR::Opcode::CompositeExtractU32x4:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static IR::Inst* FoldPhi(IR::Inst& phi, IR::Opcode opcode, IR::Type type, auto&&... args) {
+    auto insert_point = IR::Block::InstructionList::s_iterator_to(phi);
+    IR::Block* block = phi.GetParent();
+    IR::Inst* const new_phi{&*block->PrependNewInst(insert_point, IR::Opcode::Phi)};
+    new_phi->SetFlags(type);
+
+    for (size_t arg_index = 0; arg_index < phi.NumArgs(); ++arg_index) {
+        new_phi->AddPhiOperand(phi.PhiBlock(arg_index), phi.Arg(arg_index).Inst()->Arg(0));
+    }
+
+    // Insert folded opcode after block phis
+    auto it = std::ranges::find_if_not(block->Instructions(), IR::IsPhi);
+    IR::Value const replacement{&*block->PrependNewInst(it, opcode,
+                                                        {IR::Value{new_phi}, IR::Value{args}...})};
+    phi.ReplaceUsesWithAndRemove(replacement);
+    ASSERT(!insert_point->HasUses());
+    block->Instructions().erase(insert_point);
+    return new_phi;
+}
+
+static IR::Inst* FoldPhiArgOpIntoPhi(IR::Inst& phi) {
+    IR::Inst* const first_arg = phi.Arg(0).Inst();
+    const IR::Opcode opcode = first_arg->GetOpcode();
+    const IR::Type phi_type = first_arg->Arg(0).Type();
+
+    if (IsCompositeExtract(first_arg)) {
+        const u32 index = first_arg->Arg(1).U32();
+        for (size_t arg_index = 1; arg_index < phi.NumArgs(); ++arg_index) {
+            const IR::Inst* arg = phi.Arg(arg_index).Inst();
+            if (arg->Arg(1).U32() != index) {
+                return nullptr;
+            }
+        }
+        return FoldPhi(phi, opcode, phi_type, index);
+    } else if (first_arg->NumArgs() == 1) {
+        return FoldPhi(phi, opcode, phi_type);
+    }
+
+    return nullptr;
+}
+
+static bool AllPhiArgsHaveSameOp(IR::Inst& phi) {
+    IR::Inst* const first_arg = phi.Arg(0).Inst();
+    bool same_op = true;
+    for (size_t arg_index = 1; arg_index < phi.NumArgs(); ++arg_index) {
+        if (phi.Arg(arg_index).IsImmediate()) {
+            return false;
+        }
+        IR::Inst* arg = phi.Arg(arg_index).Inst();
+        if (first_arg->GetOpcode() != arg->GetOpcode()) {
+            same_op = false;
+            break;
+        }
+    }
+    return same_op;
+}
+
+static IR::Inst* VisitPhiNode(IR::Inst& phi) {
+    if (phi.Arg(0).IsImmediate()) {
+        return nullptr;
+    }
+
+    // If all phi operands are the same operation, pull them through the phi
+    if (AllPhiArgsHaveSameOp(phi)) {
+        if (IR::Inst* inst = FoldPhiArgOpIntoPhi(phi)) {
+            return inst;
+        }
+    }
+
+    // If there are identical phi nodes in the current block, deduplicate them
+    IR::Block* block = phi.GetParent();
+    for (IR::Inst& inst : block->Instructions()) {
+        if (inst.GetOpcode() != IR::Opcode::Phi) {
+            break;
+        }
+        if (&inst == &phi) {
+            continue;
+        }
+        bool identical = true;
+        for (size_t i = 0; i < inst.NumArgs(); i++) {
+            if (phi.PhiBlock(i) != inst.PhiBlock(i) || phi.Arg(i) != inst.Arg(i)) {
+                identical = false;
+                break;
+            }
+        }
+        if (identical) {
+            phi.ReplaceUsesWithAndRemove(IR::Value{&inst});
+            auto it = IR::Block::InstructionList::s_iterator_to(phi);
+            ASSERT(!it->HasUses());
+            block->Instructions().erase(it);
+            return &inst;
+        }
+    }
+
+    return nullptr;
+}
+
+void PhiSimplificationPass(IR::Program& program) {
+    std::vector<IR::Inst*> worklist;
+    for (IR::Block* const block : program.blocks) {
+        for (IR::Inst& inst : block->Instructions()) {
+            if (inst.GetOpcode() != IR::Opcode::Phi) {
+                break;
+            }
+            worklist.push_back(&inst);
+        }
+    }
+    while (!worklist.empty()) {
+        IR::Inst* phi = worklist.back();
+        worklist.pop_back();
+        if (auto* new_phi = VisitPhiNode(*phi)) {
+            worklist.push_back(new_phi);
+        }
+    }
+}
+
+void InverseBallotEliminationPass(IR::Program& program) {
+    std::vector<IR::Inst*> worklist;
+    for (IR::Block* const block : program.blocks) {
+        for (IR::Inst& inst : block->Instructions()) {
+            if (inst.GetOpcode() != IR::Opcode::InverseBallot) {
+                continue;
+            }
+            worklist.push_back(&inst);
+        }
+    }
+    std::unordered_map<IR::Inst*, IR::Value> bitwise_to_logical_map;
+    while (!worklist.empty()) {
+        IR::Inst* const inst = worklist.back();
+        worklist.pop_back();
+
+        if (inst->GetOpcode() == IR::Opcode::Void) {
+            continue;
+        }
+
+        IR::Value value{inst->Arg(0)};
+        if (value.IsImmediate()) {
+            if (value.U64() == 0ull) {
+                inst->ReplaceUsesWithAndRemove(IR::Value{false});
+            } else if (value.U64() == std::numeric_limits<u64>::max()) {
+                inst->ReplaceUsesWithAndRemove(IR::Value{true});
+            } else {
+                UNREACHABLE_MSG("Unexpected immediate argument for InverseBallot {:#x}", value.U64());
+            }
+            continue;
+        }
+
+        IR::Inst* const prod = value.Inst();
+        if (prod->GetOpcode() == IR::Opcode::Ballot) {
+            inst->ReplaceUsesWithAndRemove(prod->Arg(0));
+            continue;
+        }
+
+
+        if (prod->GetOpcode() != IR::Opcode::BitwiseAnd64 &&
+            prod->GetOpcode() != IR::Opcode::BitwiseNot64 &&
+            prod->GetOpcode() != IR::Opcode::BitwiseOr64 &&
+            prod->GetOpcode() != IR::Opcode::BitwiseXor64 &&
+            prod->GetOpcode() != IR::Opcode::SelectU64 &&
+            prod->GetOpcode() != IR::Opcode::Phi) {
+            continue;
+        }
+
+        auto [it, is_new] = bitwise_to_logical_map.try_emplace(prod);
+        if (is_new) {
+            IR::Block* const block = prod->GetParent();
+            auto insert_point = IR::Block::InstructionList::s_iterator_to(*prod);
+            IR::IREmitter ir{*block, insert_point};
+
+            if (prod->GetOpcode() == IR::Opcode::Phi) {
+                IR::Inst* const new_phi{&*block->PrependNewInst(insert_point, IR::Opcode::Phi)};
+                new_phi->SetFlags(IR::Type::U1);
+                for (size_t arg_index = 0; arg_index < prod->NumArgs(); ++arg_index) {
+                    IR::Block* const phi_block = prod->PhiBlock(arg_index);
+                    IR::IREmitter ir{*phi_block};
+                    const IR::U1 new_arg = ir.InverseBallot(IR::U64{prod->Arg(arg_index)});
+                    worklist.push_back(new_arg.Inst());
+                    new_phi->AddPhiOperand(phi_block, new_arg);
+                }
+                it->second = IR::Value{new_phi};
+            } else if (prod->GetOpcode() == IR::Opcode::SelectU64) {
+                const IR::U1 a = ir.InverseBallot(IR::U64{prod->Arg(1)});
+                worklist.push_back(a.Inst());
+                const IR::U1 b = ir.InverseBallot(IR::U64{prod->Arg(2)});
+                worklist.push_back(b.Inst());
+                it->second = ir.Select(IR::U1{prod->Arg(0)}, a, b);
+            } else {
+                const IR::U1 a = ir.InverseBallot(IR::U64{prod->Arg(0)});
+                worklist.push_back(a.Inst());
+
+                if (prod->GetOpcode() == IR::Opcode::BitwiseNot64) {
+                    it->second = ir.LogicalNot(a);
+                } else {
+                    const IR::U1 b = ir.InverseBallot(IR::U64{prod->Arg(1)});
+                    worklist.push_back(b.Inst());
+                    switch (prod->GetOpcode()) {
+                    case IR::Opcode::BitwiseAnd64:
+                        it->second = ir.LogicalAnd(a, b);
+                        break;
+                    case IR::Opcode::BitwiseOr64:
+                        it->second = ir.LogicalOr(a, b);
+                        break;
+                    case IR::Opcode::BitwiseXor64:
+                        it->second = ir.LogicalXor(a, b);
+                        break;
+                    default:
+                        break;
+                    }
+                }
+            }
+        }
+
+        auto uses = prod->Uses();
+        for (auto [user, operand] : uses) {
+            if (user->GetOpcode() == IR::Opcode::InverseBallot) {
+                user->ReplaceUsesWithAndRemove(it->second);
+            }
+        }
+    }
+}
+
 IR::Program TranslateProgram(const std::span<const u32>& code, Pools& pools, Info& info,
                              RuntimeInfo& runtime_info, const Profile& profile) {
     // Ensure first instruction is expected.
@@ -170,8 +403,11 @@ IR::Program TranslateProgram(const std::span<const u32>& code, Pools& pools, Inf
         Shader::Optimization::LowerFp64ToFp32(program);
     }
     Shader::Optimization::SsaRewritePass(program);
-    Shader::IR::DumpProgram(program, info, "post-ssa1.");
     Shader::Optimization::ConstantPropagationPass(program.post_order_blocks);
+    Shader::IR::DumpProgram(program, info, "post-ssa1.");
+    if (program.info.pgm_hash == 0x41d379bc) {
+        printf("Bad\n");
+    }
     LowerLdsSpillsToRegistersPass(program, runtime_info);
     if (info.l_stage == LogicalStage::TessellationControl) {
         Shader::Optimization::TessellationPreprocess(program, runtime_info);
@@ -210,11 +446,13 @@ IR::Program TranslateProgram(const std::span<const u32>& code, Pools& pools, Inf
     Shader::IR::DumpProgram(program, info, "post-repair.");
     Shader::Optimization::SsaRewritePass(program);
     Shader::IR::DumpProgram(program, info, "post-ssa2.");
+    PhiSimplificationPass(program);
     Shader::Optimization::ConstantPropagationPass(program.post_order_blocks);
+    InverseBallotEliminationPass(program);
     Shader::Optimization::DeadCodeEliminationPass(program);
     Shader::Optimization::SharedMemoryBarrierPass(program, runtime_info, profile);
     Shader::Optimization::CollectShaderInfoPass(program, profile);
-    // Shader::IR::DumpProgram(program, info);
+    Shader::IR::DumpProgram(program, info);
 
     return program;
 }
