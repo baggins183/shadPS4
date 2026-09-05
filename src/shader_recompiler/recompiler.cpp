@@ -1,9 +1,8 @@
 // SPDX-FileCopyrightText: Copyright 2024 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
-#include <limits>
-#include "common/logging/classes.h"
-#pragma clang optimize off
+
 #include <unordered_map>
+#include "common/logging/classes.h"
 #include "shader_recompiler/frontend/control_flow_graph.h"
 #include "shader_recompiler/frontend/decode.h"
 #include "shader_recompiler/frontend/structured_control_flow.h"
@@ -159,8 +158,8 @@ static IR::Inst* FoldPhi(IR::Inst& phi, IR::Opcode opcode, IR::Type type, auto&&
 
     // Insert folded opcode after block phis
     auto it = std::ranges::find_if_not(block->Instructions(), IR::IsPhi);
-    IR::Value const replacement{&*block->PrependNewInst(it, opcode,
-                                                        {IR::Value{new_phi}, IR::Value{args}...})};
+    IR::Value const replacement{
+        &*block->PrependNewInst(it, opcode, {IR::Value{new_phi}, IR::Value{args}...})};
     phi.ReplaceUsesWithAndRemove(replacement);
     ASSERT(!insert_point->HasUses());
     block->Instructions().erase(insert_point);
@@ -289,7 +288,8 @@ void InverseBallotEliminationPass(IR::Program& program) {
             } else if (value.U64() == std::numeric_limits<u64>::max()) {
                 inst->ReplaceUsesWithAndRemove(IR::Value{true});
             } else {
-                UNREACHABLE_MSG("Unexpected immediate argument for InverseBallot {:#x}", value.U64());
+                UNREACHABLE_MSG("Unexpected immediate argument for InverseBallot {:#x}",
+                                value.U64());
             }
             continue;
         }
@@ -300,13 +300,11 @@ void InverseBallotEliminationPass(IR::Program& program) {
             continue;
         }
 
-
         if (prod->GetOpcode() != IR::Opcode::BitwiseAnd64 &&
             prod->GetOpcode() != IR::Opcode::BitwiseNot64 &&
             prod->GetOpcode() != IR::Opcode::BitwiseOr64 &&
             prod->GetOpcode() != IR::Opcode::BitwiseXor64 &&
-            prod->GetOpcode() != IR::Opcode::SelectU64 &&
-            prod->GetOpcode() != IR::Opcode::Phi) {
+            prod->GetOpcode() != IR::Opcode::SelectU64 && prod->GetOpcode() != IR::Opcode::Phi) {
             continue;
         }
 
@@ -403,6 +401,7 @@ IR::Program TranslateProgram(const std::span<const u32>& code, Pools& pools, Inf
         Shader::Optimization::LowerFp64ToFp32(program);
     }
     Shader::Optimization::SsaRewritePass(program);
+    Shader::IR::DumpProgram(program, info, "post-ssa1.");
     Shader::Optimization::ConstantPropagationPass(program.post_order_blocks);
     Shader::IR::DumpProgram(program, info, "post-ssa1.");
     if (program.info.pgm_hash == 0x41d379bc) {
@@ -446,9 +445,10 @@ IR::Program TranslateProgram(const std::span<const u32>& code, Pools& pools, Inf
     Shader::IR::DumpProgram(program, info, "post-repair.");
     Shader::Optimization::SsaRewritePass(program);
     Shader::IR::DumpProgram(program, info, "post-ssa2.");
-    PhiSimplificationPass(program);
+    Shader::Optimization::PhiSimplificationPass(program);
+    Shader::IR::DumpProgram(program, info, "pre-ballot-elim.");
     Shader::Optimization::ConstantPropagationPass(program.post_order_blocks);
-    InverseBallotEliminationPass(program);
+    Shader::Optimization::InverseBallotEliminationPass(program);
     Shader::Optimization::DeadCodeEliminationPass(program);
     Shader::Optimization::SharedMemoryBarrierPass(program, runtime_info, profile);
     Shader::Optimization::CollectShaderInfoPass(program, profile);

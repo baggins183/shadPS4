@@ -188,8 +188,8 @@ void FoldSelect(IR::Inst& inst) {
         inst.ReplaceUsesWithAndRemove(cond.U1() ? inst.Arg(1) : inst.Arg(2));
     }
     if (inst.GetOpcode() == IR::Opcode::SelectU1) {
-        if (inst.Arg(1).IsImmediate() && inst.Arg(1).U1() == true &&
-            inst.Arg(2).IsImmediate() && inst.Arg(2).U1() == false) {
+        if (inst.Arg(1).IsImmediate() && inst.Arg(1).U1() == true && inst.Arg(2).IsImmediate() &&
+            inst.Arg(2).U1() == false) {
             inst.ReplaceUsesWithAndRemove(cond);
         }
     }

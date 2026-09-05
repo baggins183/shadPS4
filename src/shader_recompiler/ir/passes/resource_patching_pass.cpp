@@ -329,7 +329,6 @@ void PatchGlobalDataShareAccess(IR::Inst& inst, Info& info, Descriptors& descrip
     IR::IREmitter ir{*inst.GetParent(), IR::Block::InstructionList::s_iterator_to(inst)};
 
     if (inst.GetOpcode() == IR::Opcode::DataAppend || inst.GetOpcode() == IR::Opcode::DataConsume) {
-        inst.SetArg(0, ir.ShiftRightLogical(IR::U32{inst.Arg(0)}, ir.Imm32(2)));
         inst.SetArg(1, ir.Imm32(binding));
     } else {
         // Convert shared memory opcode to storage buffer atomic to GDS buffer.

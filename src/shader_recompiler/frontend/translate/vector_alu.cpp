@@ -538,8 +538,8 @@ void Translator::V_CNDMASK_B32(const GcnInst& inst) {
     } else {
         mask = GetSrc64(inst.src[2]);
     }
-    const IR::Value result =
-        ir.Select(ir.InverseBallot(mask), GetSrc<IR::F32>(inst.src[1]), GetSrc<IR::F32>(inst.src[0]));
+    const IR::Value result = ir.Select(ir.InverseBallot(mask), GetSrc<IR::F32>(inst.src[1]),
+                                       GetSrc<IR::F32>(inst.src[0]));
     SetDst(inst.dst[0], IR::U32F32{result});
 }
 
@@ -679,7 +679,8 @@ void Translator::V_AND_B32(const GcnInst& inst) {
 void Translator::V_OR_B32(bool is_xor, const GcnInst& inst) {
     const IR::U32 src0{GetSrc(inst.src[0])};
     const IR::U32 src1{GetSrc(inst.src[1])};
-    SetDst(inst.dst[0], is_xor ? IR::U32{ir.BitwiseXor(src0, src1)} : IR::U32{ir.BitwiseOr(src0, src1)});
+    SetDst(inst.dst[0],
+           is_xor ? IR::U32{ir.BitwiseXor(src0, src1)} : IR::U32{ir.BitwiseOr(src0, src1)});
 }
 
 void Translator::V_BFM_B32(const GcnInst& inst) {
@@ -712,10 +713,11 @@ void Translator::V_BCNT_U32_B32(const GcnInst& inst) {
 }
 
 void Translator::V_MBCNT_U32_B32(bool is_low, const GcnInst& inst) {
-    if (!is_low && inst.src[0].field == OperandField::SignedConstIntNeg && inst.src[0].code == 193 &&
-        inst.src[1].field == OperandField::ConstZero) {
+    if (!is_low && inst.src[0].field == OperandField::SignedConstIntNeg &&
+        inst.src[0].code == 193 && inst.src[1].field == OperandField::ConstZero) {
         return;
-    } else if (is_low && inst.src[0].field == OperandField::SignedConstIntNeg && inst.src[0].code == 193) {
+    } else if (is_low && inst.src[0].field == OperandField::SignedConstIntNeg &&
+               inst.src[0].code == 193) {
         return SetDst(inst.dst[0], ir.LaneId());
     }
     const IR::U32 thread_mask{ir.GetAttributeU32(IR::Attribute::SubgroupLtMask, is_low ? 0 : 1)};

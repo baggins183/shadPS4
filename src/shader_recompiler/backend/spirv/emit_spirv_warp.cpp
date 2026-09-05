@@ -40,12 +40,14 @@ Id EmitBallot(EmitContext& ctx, Id bit) {
 }
 
 Id EmitBallotFindLsb(EmitContext& ctx, Id mask) {
-    const Id value{ctx.OpCompositeConstruct(ctx.U32[4], ctx.OpBitcast(ctx.U32[2], mask), ctx.u32_zero_value, ctx.u32_zero_value)};
+    const Id value{ctx.OpCompositeConstruct(ctx.U32[4], ctx.OpBitcast(ctx.U32[2], mask),
+                                            ctx.u32_zero_value, ctx.u32_zero_value)};
     return ctx.OpGroupNonUniformBallotFindLSB(ctx.U32[1], SubgroupScope(ctx), value);
 }
 
 Id EmitInverseBallot(EmitContext& ctx, Id mask) {
-    const Id value{ctx.OpCompositeConstruct(ctx.U32[4], ctx.OpBitcast(ctx.U32[2], mask), ctx.u32_zero_value, ctx.u32_zero_value)};
+    const Id value{ctx.OpCompositeConstruct(ctx.U32[4], ctx.OpBitcast(ctx.U32[2], mask),
+                                            ctx.u32_zero_value, ctx.u32_zero_value)};
     return ctx.OpGroupNonUniformInverseBallot(ctx.U1[1], SubgroupScope(ctx), value);
 }
 

@@ -96,6 +96,8 @@ constexpr IR::Opcode UndefOpcode(IR::RegTag tag) noexcept {
         return IR::Opcode::UndefU1;
     case RegType::VirtualReg:
         switch (tag.reg.type) {
+        case IR::Type::U64:
+            return IR::Opcode::UndefU64;
         case IR::Type::U32:
             return IR::Opcode::UndefU32;
         case IR::Type::F32:
