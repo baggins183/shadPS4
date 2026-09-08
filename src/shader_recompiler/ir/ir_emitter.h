@@ -108,8 +108,8 @@ public:
     [[nodiscard]] U32U64 SharedAtomicOr(const U32& address, const U32U64& data, bool is_gds);
     [[nodiscard]] U32U64 SharedAtomicXor(const U32& address, const U32U64& data, bool is_gds);
 
-    [[nodiscard]] U32U64 SharedAtomicFMin(const U32& address, const U32U64& data, bool is_gds);
-    [[nodiscard]] U32U64 SharedAtomicFMax(const U32& address, const U32U64& data, bool is_gds);
+    [[nodiscard]] F32 SharedAtomicFMin(const U32& address, const F32& data, bool is_gds);
+    [[nodiscard]] F32 SharedAtomicFMax(const U32& address, const F32& data, bool is_gds);
 
     template <typename T = U32>
     [[nodiscard]] T SharedAtomicInc(const U32& address, bool is_gds);

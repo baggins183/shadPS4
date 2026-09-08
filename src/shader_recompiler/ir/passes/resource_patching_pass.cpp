@@ -407,6 +407,12 @@ void PatchGlobalDataShareAccess(IR::Inst& inst, Info& info, Descriptors& descrip
             buffer.used_types |= IR::Type::U64;
             break;
         }
+        case IR::Opcode::SharedAtomicFmin32:
+            inst.ReplaceUsesWith(ir.BufferAtomicFMin(handle, address_dwords, inst.Arg(1), {}));
+            break;
+        case IR::Opcode::SharedAtomicFmax32:
+            inst.ReplaceUsesWith(ir.BufferAtomicFMax(handle, address_dwords, inst.Arg(1), {}));
+            break;
         default:
             UNREACHABLE();
         }

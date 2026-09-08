@@ -39,6 +39,7 @@ struct Profile {
     bool supports_image_fp32_atomic_min_max{};
     bool supports_buffer_int64_atomics{};
     bool supports_shared_int64_atomics{};
+    bool supports_shared_f32_atomic_minmax{};
     bool supports_workgroup_explicit_memory_layout{};
     bool supports_amd_shader_explicit_vertex_parameter{};
     bool supports_fragment_shader_barycentric{};

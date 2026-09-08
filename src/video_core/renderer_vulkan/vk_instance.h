@@ -228,6 +228,11 @@ public:
         return vk12_features.shaderSharedInt64Atomics;
     }
 
+    /// Returns true if 64-bit integer atomic operations can be used on shared memory
+    bool IsSharedFloat32AtomicMinMaxSupported() const {
+        return shader_atomic_float2_features.shaderSharedFloat32AtomicMinMax;
+    }
+
     /// Returns true if the subgroup size can be set to match guest subgroup size
     bool IsSubgroupSize64Supported() const {
         return vk13_features.subgroupSizeControl && vk13_props.maxSubgroupSize >= 64;

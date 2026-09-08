@@ -72,12 +72,13 @@ EmitContext::EmitContext(const Profile& profile_, const RuntimeInfo& runtime_inf
                          Bindings& binding_)
     : Sirit::Module(profile_.supported_spirv), info{info_}, runtime_info{runtime_info_},
       profile{profile_}, stage{info.stage}, l_stage{info.l_stage}, binding{binding_} {
+
+    AddCapability(spv::Capability::VulkanMemoryModel);
+    AddCapability(spv::Capability::VulkanMemoryModelDeviceScope);
     if (info.uses_dma) {
-        AddCapability(spv::Capability::VulkanMemoryModel);
         // SetMemoryModel(spv::AddressingModel::PhysicalStorageBuffer64, spv::MemoryModel::GLSL450);
         SetMemoryModel(spv::AddressingModel::PhysicalStorageBuffer64, spv::MemoryModel::Vulkan);
     } else {
-        AddCapability(spv::Capability::VulkanMemoryModel);
         // SetMemoryModel(spv::AddressingModel::Logical, spv::MemoryModel::GLSL450);
         SetMemoryModel(spv::AddressingModel::Logical, spv::MemoryModel::Vulkan);
     }
@@ -317,17 +318,12 @@ void EmitContext::DefineInputs() {
     if (info.uses_lane_id || info.UsesOrderedCount()) {
         subgroup_local_invocation_id = DefineVariable(
             U32[1], spv::BuiltIn::SubgroupLocalInvocationId, spv::StorageClass::Input);
-        Decorate(subgroup_local_invocation_id, spv::Decoration::Flat); // TODO Flat?
+        // Decorate(subgroup_local_invocation_id, spv::Decoration::Flat); // TODO Flat?
     }
     if (info.loads.GetAny(IR::Attribute::SubgroupLtMask)) {
         subgroup_lt_mask =
             DefineVariable(U32[4], spv::BuiltIn::SubgroupLtMask, spv::StorageClass::Input);
-        Decorate(subgroup_lt_mask, spv::Decoration::Flat);
-    }
-    if (info.loads.GetAny(IR::Attribute::SubgroupLtMask)) {
-        subgroup_lt_mask =
-            DefineVariable(U32[4], spv::BuiltIn::SubgroupLtMask, spv::StorageClass::Input);
-        Decorate(subgroup_lt_mask, spv::Decoration::Flat);
+        // Decorate(subgroup_lt_mask, spv::Decoration::Flat);
     }
     switch (l_stage) {
     case LogicalStage::Vertex: {
@@ -1324,6 +1320,9 @@ void EmitContext::DefineFunctions() {
     }
     if (info.UsesOrderedCount()) {
         DefineOrderedCountFunctions();
+    }
+    if (info.uses_buffer_atomic_float_min_max && !profile.supports_buffer_fp32_atomic_min_max) {
+        DefineFloatBufferMinMax();
     }
 }
 

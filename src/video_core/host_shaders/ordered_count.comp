@@ -233,7 +233,14 @@ uint ordered_count_add_per_wave(uint workgroup_index, uint packer_id, uint value
     uint prev_count = 0;
 
     // TODO can there be no active threads?
+#if 1
     bool elected = elect_generic(is_active);
+#else
+    // Hack for GOW because this is placed inside exec-divergent branch
+    // currently (but only one thread active anyways in what Ive seen)
+    bool elected = is_active;
+#endif
+
     if (elected) {
         uint wave_index = get_global_wave_index(workgroup_index);
 
@@ -257,7 +264,12 @@ uint ordered_count_swap_per_wave(uint workgroup_index, uint packer_id, uint valu
     uint prev_count = 0;
 
     // TODO can there be no active threads?
+#if 1
     bool elected = elect_generic(is_active);
+#else
+    bool elected = is_active;
+#endif
+
     if (elected) {
         uint wave_index = get_global_wave_index(workgroup_index);
 

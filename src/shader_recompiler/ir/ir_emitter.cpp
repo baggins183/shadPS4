@@ -348,12 +348,12 @@ U32U64 IREmitter::SharedAtomicIMax(const U32& address, const U32U64& data, bool 
     }
 }
 
-U32U64 IREmitter::SharedAtomicFMin(const U32& address, const U32U64& data, bool is_gds) {
-    return Inst<U32>(Opcode::SharedAtomicFmin32, Flags{is_gds}, address, data);
+F32 IREmitter::SharedAtomicFMin(const U32& address, const F32& data, bool is_gds) {
+    return Inst<F32>(Opcode::SharedAtomicFmin32, Flags{is_gds}, address, data);
 }
 
-U32U64 IREmitter::SharedAtomicFMax(const U32& address, const U32U64& data, bool is_gds) {
-    return Inst<U32>(Opcode::SharedAtomicFmax32, Flags{is_gds}, address, data);
+F32 IREmitter::SharedAtomicFMax(const U32& address, const F32& data, bool is_gds) {
+    return Inst<F32>(Opcode::SharedAtomicFmax32, Flags{is_gds}, address, data);
 }
 
 U32U64 IREmitter::SharedAtomicAnd(const U32& address, const U32U64& data, bool is_gds) {

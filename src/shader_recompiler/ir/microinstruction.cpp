@@ -111,6 +111,8 @@ bool Inst::MayHaveSideEffects() const noexcept {
     case Opcode::SharedAtomicAnd64:
     case Opcode::SharedAtomicOr64:
     case Opcode::SharedAtomicXor64:
+    case Opcode::SharedAtomicFmin32:
+    case Opcode::SharedAtomicFmax32:
     case Opcode::ImageWrite:
     case Opcode::ImageAtomicIAdd32:
     case Opcode::ImageAtomicSMin32:

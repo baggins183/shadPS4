@@ -242,6 +242,20 @@ SamplerPatchResult CheckClearAnisoRatioAndThresholdPattern(IR::Value value) {
     return {inst->Arg(0), true};
 }
 
+SamplerPatchResult CheckForceUnormNfmt(IR::Value value) {
+    auto* inst = value.TryInst();
+    if (!inst) {
+        return {value, false};
+    }
+
+    if (inst->GetOpcode() != IR::Opcode::BitwiseAnd32 || !inst->Arg(1).IsImmediate() ||
+        inst->Arg(1).U32() != 0xc3ffffffu) {
+        return {value, false};
+    }
+
+    return {inst->Arg(0), true};
+}
+
 IR::Inst* FindSharpSource(IR::Inst* handle) {
     ASSERT(IsSharpSource(handle));
     return handle;
@@ -312,6 +326,9 @@ void DiscoverImageSharp(IR::Block& block, IR::Inst& inst, ResourceDiscoveryList&
         tsharp.post_op = SharpFetchPostOp::ConvertCubeTo2DArray;
         tsharp.dwords[3] = tsharp_dw3;
         tsharp.dwords[4] = tsharp_dw4;
+    } else if (auto [ssharp_dw1, found] = CheckForceUnormNfmt(tsharp.dwords[1]); found) {
+        tsharp.post_op = SharpFetchPostOp::ForceNfmtToUnorm; // Could generalize to any nfmt
+        tsharp.dwords[1] = ssharp_dw1;
     }
 
     MarkReadConstBufferSharpSources(tsharp);

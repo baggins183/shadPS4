@@ -114,6 +114,8 @@ inline bool IsDataRingInstruction(const IR::Inst& inst) {
     case IR::Opcode::SharedAtomicInc64:
     case IR::Opcode::SharedAtomicDec32:
     case IR::Opcode::SharedAtomicDec64:
+    case IR::Opcode::SharedAtomicFmin32:
+    case IR::Opcode::SharedAtomicFmax32:
         return inst.Flags<bool>(); // is_gds
     default:
         return false;

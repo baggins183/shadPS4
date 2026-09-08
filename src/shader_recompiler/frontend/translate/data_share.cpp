@@ -83,9 +83,9 @@ void Translator::EmitDataShare(const GcnInst& inst) {
     case Opcode::DS_READ2ST64_B64:
         return DS_READ(64, false, true, true, inst);
     case Opcode::DS_MIN_F32:
-        return DS_OP(inst, AtomicOp::Fmin, false);
+        return DS_OP_F32(inst, AtomicOp::Fmin);
     case Opcode::DS_MAX_F32:
-        return DS_OP(inst, AtomicOp::Fmax, false);
+        return DS_OP_F32(inst, AtomicOp::Fmax);
     case Opcode::DS_ORDERED_COUNT:
         return DS_ORDERED_COUNT(inst);
     default:
@@ -158,10 +158,6 @@ void Translator::DS_OP(const GcnInst& inst, AtomicOp op, bool rtn) {
             return ir.SharedAtomicInc<T>(addr_offset, is_gds);
         case AtomicOp::Dec:
             return ir.SharedAtomicDec<T>(addr_offset, is_gds);
-        case AtomicOp::Fmin:
-            return ir.SharedAtomicFMin(addr_offset, data, is_gds);
-        case AtomicOp::Fmax:
-            return ir.SharedAtomicFMax(addr_offset, data, is_gds);
         default:
             UNREACHABLE();
         }
@@ -173,6 +169,27 @@ void Translator::DS_OP(const GcnInst& inst, AtomicOp op, bool rtn) {
             SetDst64(inst.dst[0], original_val);
         }
     }
+}
+
+void Translator::DS_OP_F32(const GcnInst& inst, AtomicOp op) {
+    const bool is_gds = inst.control.ds.gds;
+    const IR::U32 addr{GetSrc(inst.src[0])};
+    const IR::F32 data{GetSrc<IR::F32>(inst.src[1])};
+
+    const IR::U32 offset =
+        ir.Imm32((u32(inst.control.ds.offset1) << 8u) + u32(inst.control.ds.offset0));
+    const IR::U32 addr_offset = ir.IAdd(addr, offset);
+    const IR::F32 original_val = [&] {
+        switch (op) {
+        case AtomicOp::Fmin:
+            return ir.SharedAtomicFMin(addr_offset, data, is_gds);
+        case AtomicOp::Fmax:
+            return ir.SharedAtomicFMax(addr_offset, data, is_gds);
+        default:
+            UNREACHABLE();
+        }
+    }();
+    SetDst(inst.dst[0], original_val);
 }
 
 void Translator::DS_WRITE(int bit_size, bool is_signed, bool is_pair, bool stride64,

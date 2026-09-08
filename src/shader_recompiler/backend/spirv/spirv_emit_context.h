@@ -329,6 +329,23 @@ public:
         NumClass,
     };
 
+    static inline PointerSize GetPointerSize(PointerType pointer_type) {
+        switch (pointer_type) {
+        case PointerType::U8:
+            return PointerSize::B8;
+        case PointerType::U16:
+            return PointerSize::B16;
+        case PointerType::U32:
+        case PointerType::F32:
+            return PointerSize::B32;
+        case PointerType::U64:
+        case PointerType::F64:
+            return PointerSize::B64;
+        default:
+            UNREACHABLE();
+        }
+    }
+
     struct BufferSpv {
         Id id;
         Id pointer_type;
@@ -405,6 +422,9 @@ public:
     u32 max_num_waves{};
     Id ordered_count_subgroup_counts_array_type{};
 
+    Id buffer_atomic_float_min_function{};
+    Id buffer_atomic_float_max_function{};
+
     u32 ordered_count_utility_buffer_binding{};
     u32 shared_mem_ordered_count_base;
 
@@ -432,6 +452,9 @@ private:
     Id DefineGetBdaPointer();
 
     Id DefineReadConst(bool dynamic);
+
+    void DefineFloatSharedMinMax();
+    void DefineFloatBufferMinMax();
 
     Id GetBufferSize(u32 sharp_idx);
 

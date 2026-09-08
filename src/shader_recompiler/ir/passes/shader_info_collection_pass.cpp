@@ -8,7 +8,7 @@
 
 namespace Shader::Optimization {
 
-void Visit(Info& info, const IR::Inst& inst) {
+void Visit(Info& info, const IR::Inst& inst, const Profile& profile) {
     switch (inst.GetOpcode()) {
     case IR::Opcode::GetAttribute:
     case IR::Opcode::GetAttributeU32:
@@ -57,9 +57,13 @@ void Visit(Info& info, const IR::Inst& inst) {
         break;
     case IR::Opcode::SharedAtomicFmin32:
     case IR::Opcode::SharedAtomicFmax32:
-        // TODO
-        info.shared_types |= IR::Type::F32;
-        info.uses_shared_f32_atomics = true;
+        info.uses_shared_atomic_float_min_max = true;
+        if (profile.supports_shared_f32_atomic_minmax) {
+            // TODO should probably leave for backend to decide
+            info.shared_types |= IR::Type::F32;
+        } else {
+            info.shared_types |= IR::Type::U32;
+        }
         break;
 
     case IR::Opcode::SharedAtomicIAdd64:
@@ -174,7 +178,7 @@ void CollectShaderInfoPass(IR::Program& program, const Profile& profile) {
     Info& info = program.info;
     for (IR::Block* const block : program.post_order_blocks) {
         for (IR::Inst& inst : block->Instructions()) {
-            Visit(info, inst);
+            Visit(info, inst, profile);
         }
     }
 

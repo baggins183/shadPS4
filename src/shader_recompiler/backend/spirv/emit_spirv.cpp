@@ -369,10 +369,14 @@ void SetupCapabilities(const Info& info, const Profile& profile, const RuntimeIn
             ctx.AddCapability(spv::Capability::WorkgroupMemoryExplicitLayout16BitAccessKHR);
         }
     }
-    if (info.uses_shared_f32_atomics) {
-        // TODO emulate with U32
-        ctx.AddExtension("SPV_EXT_shader_atomic_float_min_max");
-        ctx.AddCapability(spv::Capability::AtomicFloat32MinMaxEXT);
+    if (info.uses_shared_atomic_float_min_max) {
+        if (profile.supports_shared_f32_atomic_minmax) {
+            ctx.AddExtension("SPV_EXT_shader_atomic_float_min_max");
+            ctx.AddCapability(spv::Capability::AtomicFloat32MinMaxEXT);
+        } else {
+            LOG_WARNING(Render_Recompiler, "Shader uses f32 atomic min/max that your"
+                                           "Vulkan instance does not natively support");
+        }
     }
     if (info.uses_buffer_int64_atomics || info.uses_shared_int64_atomics) {
         if (info.uses_buffer_int64_atomics) {
