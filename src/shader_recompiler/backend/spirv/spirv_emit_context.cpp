@@ -325,6 +325,11 @@ void EmitContext::DefineInputs() {
             DefineVariable(U32[4], spv::BuiltIn::SubgroupLtMask, spv::StorageClass::Input);
         // Decorate(subgroup_lt_mask, spv::Decoration::Flat);
     }
+    if (info.loads.GetAny(IR::Attribute::SubgroupLtMask)) {
+        subgroup_lt_mask =
+            DefineVariable(U32[4], spv::BuiltIn::SubgroupLtMask, spv::StorageClass::Input);
+        Decorate(subgroup_lt_mask, spv::Decoration::Flat);
+    }
     switch (l_stage) {
     case LogicalStage::Vertex: {
         vertex_index = DefineVariable(U32[1], spv::BuiltIn::VertexIndex, spv::StorageClass::Input);

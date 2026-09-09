@@ -306,7 +306,7 @@ void SetupCapabilities(const Info& info, const Profile& profile, const RuntimeIn
     if (info.uses_group_quad) {
         ctx.AddCapability(spv::Capability::GroupNonUniformQuad);
     }
-    if (info.uses_group_ballot) {
+    if (info.uses_group_ballot || info.loads.Get(IR::Attribute::SubgroupLtMask)) {
         ctx.AddCapability(spv::Capability::GroupNonUniformBallot);
     }
     const auto stage = info.l_stage;
@@ -545,7 +545,8 @@ void SetupRoundingMode(EmitContext& ctx, const Profile& profile, const RuntimeIn
             });
         }
     } else if (fp_round_mode != AmdGpu::FpRoundMode::NearestEven) {
-        LOG_WARNING(Render_Vulkan, "Unknown FP rounding mode {}", u32(fp_round_mode));
+        LOG_WARNING(Render_Vulkan, "Unimplemented FP rounding mode {}",
+                    magic_enum::enum_name(fp_round_mode));
     }
 
     if (ctx.info.uses_fp16 || ctx.info.uses_fp64) {
