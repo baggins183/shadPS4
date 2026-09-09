@@ -341,8 +341,7 @@ void Translator::DS_ORDERED_COUNT(const GcnInst& inst) {
     OrderedCount::Flags flags{.raw = offset};
 
     const IR::U1 is_active = ir.GetExec();
-    const IR::U32 ordered_count_result =
-        ir.OrderedCount(ir.Imm32(packer_id), value, is_active, flags);
+    const IR::U32 ordered_count_result = ir.OrderedCount(ir.GetM0(), value, is_active, flags);
     // const IR::U32 result_broadcast = ir.ReadFirstLane(ordered_count_result);
     SetDst(inst.dst[0], ordered_count_result);
 }

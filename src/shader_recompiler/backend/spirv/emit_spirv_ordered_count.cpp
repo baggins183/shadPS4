@@ -36,7 +36,7 @@ void EmitContext::DefineOrderedCountFunctions() {
     DecorateLinkage(init_emulated_workgroup_index_function, spv::LinkageType::Import,
                     "init_emulated_workgroup_index");
 
-    const Id ordered_count_func_type{TypeFunction(U32[1], U32[1], U32[1], U32[1], U1[1])};
+    const Id ordered_count_func_type{TypeFunction(U32[1], U32[1], U32[1], U32[1], U32[1], U1[1])};
 
     ordered_count_add_per_wave_function =
         OpFunction(U32[1], spv::FunctionControlMask::MaskNone, ordered_count_func_type);
@@ -57,8 +57,9 @@ void EmitContext::DefineOrderedCountFunctions() {
                     "ordered_count_swap_per_wave");
 }
 
-Id EmitOrderedCount(EmitContext& ctx, IR::Inst* inst, u32 packer_id, Id value, Id is_active) {
+Id EmitOrderedCount(EmitContext& ctx, IR::Inst* inst, Id m0, Id value, Id is_active) {
     const auto flags = inst->Flags<OrderedCount::Flags>();
+    const u32 packer_id = flags.packer_id.Value();
     const bool can_reconverge_workgroup = flags.can_reconverge_workgroup.Value();
 
     ASSERT(flags.wave_release.Value());
@@ -78,8 +79,8 @@ Id EmitOrderedCount(EmitContext& ctx, IR::Inst* inst, u32 packer_id, Id value, I
         UNREACHABLE();
     }
 
-    return ctx.OpFunctionCall(ctx.U32[1], function, ctx.workgroup_index_id, ctx.ConstU32(packer_id),
-                              value, is_active);
+    return ctx.OpFunctionCall(ctx.U32[1], function, ctx.workgroup_index_id, m0,
+                              ctx.ConstU32(packer_id), value, is_active);
 }
 
 } // namespace Shader::Backend::SPIRV

@@ -484,7 +484,7 @@ Id EmitInverseBallot(EmitContext& ctx, Id mask);
 Id EmitGroupAny(EmitContext& ctx, Id bit);
 Id EmitDataAppend(EmitContext& ctx, Id gds_addr, u32 binding);
 Id EmitDataConsume(EmitContext& ctx, Id gds_addr, u32 binding);
-Id EmitOrderedCount(EmitContext& ctx, IR::Inst* inst, u32 packer_id, Id value, Id is_active);
+Id EmitOrderedCount(EmitContext& ctx, IR::Inst* inst, Id m0, Id value, Id is_active);
 
 void EmitEmitVertex(EmitContext& ctx);
 void EmitEmitPrimitive(EmitContext& ctx);

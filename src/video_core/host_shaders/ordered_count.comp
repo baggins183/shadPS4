@@ -228,7 +228,7 @@ uint get_global_wave_index(uint workgroup_index) {
     return workgroup_index * num_waves + wave_id;
 }
 
-uint ordered_count_add_per_wave(uint workgroup_index, uint packer_id, uint value, bool is_active)
+uint ordered_count_add_per_wave(uint workgroup_index, uint m0, uint packer_id, uint value, bool is_active)
 {
     uint prev_count = 0;
 
@@ -259,7 +259,7 @@ uint ordered_count_add_per_wave(uint workgroup_index, uint packer_id, uint value
     return readfirstlane_generic(prev_count, is_active);
 }
 
-uint ordered_count_swap_per_wave(uint workgroup_index, uint packer_id, uint value, bool is_active)
+uint ordered_count_swap_per_wave(uint workgroup_index, uint m0, uint packer_id, uint value, bool is_active)
 {
     uint prev_count = 0;
 
@@ -288,7 +288,7 @@ uint ordered_count_swap_per_wave(uint workgroup_index, uint packer_id, uint valu
     return readfirstlane_generic(prev_count, is_active);
 }
 
-uint ordered_count_add_workgroupsync(uint workgroup_index, uint packer_id, uint value, bool is_active) {
+uint ordered_count_add_workgroupsync(uint workgroup_index, uint m0, uint packer_id, uint value, bool is_active) {
     uint wave_id = get_wave_id();
     uint num_waves = get_num_waves();
 

@@ -637,9 +637,9 @@ U32 IREmitter::DataConsume(const U32& counter) {
     return Inst<U32>(Opcode::DataConsume, counter, Imm32(0));
 }
 
-U32 IREmitter::OrderedCount(const U32& packer_id, const U32& value, const U1& is_active,
+U32 IREmitter::OrderedCount(const U32& m0, const U32& value, const U1& is_active,
                             OrderedCount::Flags flags) {
-    return Inst<U32>(Opcode::OrderedCount, Flags{flags}, packer_id, value, is_active);
+    return Inst<U32>(Opcode::OrderedCount, Flags{flags}, m0, value, is_active);
 }
 
 U32 IREmitter::LaneId() {

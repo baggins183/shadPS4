@@ -165,7 +165,8 @@ void Visit(Info& info, const IR::Inst& inst, const Profile& profile) {
         info.uses_unpack_10_11_11 = true;
         break;
     case IR::Opcode::OrderedCount: {
-        u32 packer_id = inst.Arg(0).U32();
+        const auto flags = inst.Flags<OrderedCount::Flags>();
+        const u32 packer_id = flags.packer_id.Value();
         info.num_ordered_count_packers = std::max(info.num_ordered_count_packers, packer_id + 1);
         break;
     }

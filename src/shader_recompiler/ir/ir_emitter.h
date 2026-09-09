@@ -174,7 +174,7 @@ public:
 
     [[nodiscard]] U32 DataAppend(const U32& counter);
     [[nodiscard]] U32 DataConsume(const U32& counter);
-    [[nodiscard]] U32 OrderedCount(const U32& packer_id, const U32& value, const U1& is_active,
+    [[nodiscard]] U32 OrderedCount(const U32& m0, const U32& value, const U1& is_active,
                                    OrderedCount::Flags flags);
     [[nodiscard]] U32 LaneId();
     [[nodiscard]] U32 WarpId();
