@@ -1058,6 +1058,11 @@ void EmitContext::DefineSharedMemory() {
     const u32 shared_memory_guest_size = runtime_info.cs_info.shared_memory_size;
     shared_mem_total_size = shared_mem_guest_base + shared_memory_guest_size;
 
+    // TODO refactor
+    shared_mem_total_size = Common::AlignUp(shared_mem_total_size, sizeof(u64));
+    shared_mem_total_size += info.shared_memory_scratch_size;
+    const u32 shared_memory_main_module_size = shared_mem_total_size;
+
     const auto make_type = [&](IR::Type type, Id element_type, u32 element_size,
                                std::string_view name) {
         if (False(info.shared_types & type)) {
@@ -1065,7 +1070,7 @@ void EmitContext::DefineSharedMemory() {
             return std::make_tuple(Id{}, Id{}, Id{});
         }
 
-        const u32 num_elements{Common::DivCeil(shared_memory_guest_size, element_size)};
+        const u32 num_elements{Common::DivCeil(shared_memory_main_module_size, element_size)};
         const Id array_type{TypeArray(element_type, ConstU32(num_elements))};
 
         const auto mem_type = [&] {
