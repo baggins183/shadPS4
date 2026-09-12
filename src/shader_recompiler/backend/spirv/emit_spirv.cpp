@@ -704,6 +704,7 @@ std::vector<u32> LinkSPIRV(EmitContext& ctx, const Profile& profile,
                     fmt::format("MAX_NUM_WAVES={}", ctx.max_num_waves),
                     fmt::format("UTILITY_BUFFER_BINDING={}",
                                 ctx.ordered_count_utility_buffer_binding),
+                    fmt::format("GDS_BUFFER_BINDING={}", ctx.gds_buffer_binding),
                     fmt::format("SHARED_MEMORY_BASE_OFFSET={}", ctx.shared_mem_ordered_count_base),
                     fmt::format("NUM_COUNTERS={}", info.num_ordered_count_packers),
                 });

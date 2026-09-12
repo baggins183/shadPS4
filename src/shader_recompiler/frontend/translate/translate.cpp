@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2024-2026 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include "common/div_ceil.h"
 #include "common/io_file.h"
 #include "common/path_util.h"
 #include "core/emulator_settings.h"
@@ -224,6 +225,27 @@ void Translator::EmitPrologue(IR::Block* first_block) {
         }
         if (runtime_info.cs_info.tgid_enable[2]) {
             ir.SetScalarReg(dst_sreg++, ir.GetAttributeU32(IR::Attribute::WorkgroupId, 2));
+        }
+        if (runtime_info.cs_info.tg_size_en) {
+            // {first_wavefront, 14’b0000, ordered_append_term[10:0],
+            // threadgroup_size_in_wavefronts[5:0]}
+            const u32 wg_size_x = runtime_info.cs_info.workgroup_size[0];
+            const u32 wg_size_y = runtime_info.cs_info.workgroup_size[1];
+            const u32 wg_size_z = runtime_info.cs_info.workgroup_size[2];
+            const u32 num_waves = Common::DivCeil(wg_size_x * wg_size_y * wg_size_z, 64u);
+            ASSERT(num_waves < (1 << 6));
+            IR::U32 threadgroup_info = ir.Imm32(num_waves);
+
+            // TODO: ordered_append_term should be wave id or workgroup index based on dispatch
+            // initiator ORDERED_APPEND_MODE (So far Ive only seen 64 thread workgroups anyways)
+            ASSERT(num_waves == 1);
+            // TODO should have a WaveId attribute that lowers to localInvocationIndex/64 but looks
+            // wave-uniform until then
+            const IR::U32 ordered_append_term{ir.GetAttributeU32(IR::Attribute::WorkgroupIndex)};
+            threadgroup_info =
+                ir.BitFieldInsert(threadgroup_info, ordered_append_term, ir.Imm32(6), ir.Imm32(11));
+
+            ir.SetScalarReg(dst_sreg++, threadgroup_info);
         }
         break;
     case LogicalStage::Geometry:

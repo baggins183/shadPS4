@@ -13,6 +13,8 @@
 #extension GL_EXT_shader_atomic_int64 : require
 #extension GL_KHR_shader_subgroup_vote : require
 
+#define GOW 1 // hack
+
 struct WarpMem {
     uint a[MAX_NUM_WAVES];
     uint b[MAX_NUM_WAVES];
@@ -44,6 +46,11 @@ layout(std430, set = 0, binding = UTILITY_BUFFER_BINDING) buffer ordered_count_u
     uint next_emulated_workgroup_index;
     // TODO play with offsets for cache opts
     Counter counters[NUM_COUNTERS];
+};
+
+layout(std430, set = 0, binding = GDS_BUFFER_BINDING) buffer gds_buffer
+{
+    uint gds_data[];
 };
 
 void init_shared_mem() {
@@ -231,14 +238,15 @@ uint get_global_wave_index(uint workgroup_index) {
 uint ordered_count_add_per_wave(uint workgroup_index, uint m0, uint packer_id, uint value, bool is_active)
 {
     uint prev_count = 0;
+    uint gds_index = bitfieldExtract(m0, 18, 14);
 
     // TODO can there be no active threads?
-#if 1
-    bool elected = elect_generic(is_active);
-#else
+#if GOW
     // Hack for GOW because this is placed inside exec-divergent branch
     // currently (but only one thread active anyways in what Ive seen)
     bool elected = is_active;
+#else
+    bool elected = elect_generic(is_active);
 #endif
 
     if (elected) {
@@ -251,7 +259,7 @@ uint ordered_count_add_per_wave(uint workgroup_index, uint m0, uint packer_id, u
             }
         }
 
-        prev_count = atomicAdd(counters[packer_id].global_count, value);
+        prev_count = atomicAdd(gds_data[gds_index], value);
         atomicStore(counters[packer_id].next_writer, wave_index + 1, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
     }
 
@@ -262,12 +270,13 @@ uint ordered_count_add_per_wave(uint workgroup_index, uint m0, uint packer_id, u
 uint ordered_count_swap_per_wave(uint workgroup_index, uint m0, uint packer_id, uint value, bool is_active)
 {
     uint prev_count = 0;
+    uint gds_index = bitfieldExtract(m0, 18, 14);
 
     // TODO can there be no active threads?
-#if 1
-    bool elected = elect_generic(is_active);
-#else
+#if GOW
     bool elected = is_active;
+#else
+    bool elected = elect_generic(is_active);
 #endif
 
     if (elected) {
@@ -280,7 +289,7 @@ uint ordered_count_swap_per_wave(uint workgroup_index, uint m0, uint packer_id, 
             }
         }
 
-        prev_count = atomicExchange(counters[packer_id].global_count, value);
+        prev_count = atomicExchange(gds_data[gds_index], value);
         atomicStore(counters[packer_id].next_writer, wave_index + 1, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
     }
 
@@ -291,6 +300,7 @@ uint ordered_count_swap_per_wave(uint workgroup_index, uint m0, uint packer_id, 
 uint ordered_count_add_workgroupsync(uint workgroup_index, uint m0, uint packer_id, uint value, bool is_active) {
     uint wave_id = get_wave_id();
     uint num_waves = get_num_waves();
+    uint gds_index = bitfieldExtract(m0, 18, 14);
 
     // TODO can there be no active threads?
     bool elected = elect_generic(is_active);
@@ -328,7 +338,7 @@ uint ordered_count_add_workgroupsync(uint workgroup_index, uint m0, uint packer_
             }
         }
 
-        uint prev_count = atomicAdd(counters[packer_id].global_count, workgroup_count);
+        uint prev_count = atomicAdd(gds_data[gds_index], workgroup_count);
         atomicStore(counters[packer_id].next_writer, workgroup_index + 1, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
         scratch_val = prev_count;
     }

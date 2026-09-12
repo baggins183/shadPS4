@@ -410,7 +410,8 @@ Liverpool::Task Liverpool::ProcessGraphics(std::span<const u32> dcb, std::span<c
             }
             case PM4ItOpcode::SetPredication: {
                 const auto* set_predication = reinterpret_cast<const PM4CmdSetPredication*>(header);
-                LOG_WARNING(Render, "Unimplemented IT_SET_PREDICATION pred_op = {}", magic_enum::enum_name(set_predication->pred_op));
+                LOG_WARNING(Render, "Unimplemented IT_SET_PREDICATION pred_op = {}",
+                            magic_enum::enum_name(set_predication->pred_op));
                 break;
             }
             case PM4ItOpcode::IndexType: {
@@ -611,6 +612,13 @@ Liverpool::Task Liverpool::ProcessGraphics(std::span<const u32> dcb, std::span<c
                                                    cs_program);
                 }
                 if (rasterizer && (cs_program.dispatch_initiator & 1)) {
+                    // TODO need to propagate ORDERED_APPEND_MODE? (bit 4)
+                    if (cs_program.dispatch_initiator & (1 << 3)) {
+                        const auto& cs_pgm = GetCsRegs();
+                        const auto cs_params = AmdGpu::GetParams(cs_pgm);
+                        LOG_ERROR(Render_Vulkan, "ORDERED_APPEND_MODE: {}, hash cs_{:#018x}",
+                                  cs_program.dispatch_initiator & (1 << 4), cs_params.hash);
+                    }
                     const auto cmd_address = reinterpret_cast<const void*>(header);
                     if (host_markers_enabled) {
                         rasterizer->ScopeMarkerBegin(

@@ -69,8 +69,8 @@ Id EmitOrderedCount(EmitContext& ctx, IR::Inst* inst, Id m0, Id value, Id is_act
     case OrderedCount::Op::Add:
         // function = can_reconverge_workgroup ? ctx.ordered_count_add_per_workgroup_function :
         // ctx.ordered_count_add_per_wave_function;
-        function = ctx.ordered_count_add_per_workgroup_function;
-        // function = ctx.ordered_count_add_per_wave_function; // GOW needs atm
+        // function = ctx.ordered_count_add_per_workgroup_function;
+        function = ctx.ordered_count_add_per_wave_function; // GOW needs atm
         break;
     case OrderedCount::Op::Swap:
         function = ctx.ordered_count_swap_function;

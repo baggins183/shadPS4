@@ -333,6 +333,10 @@ void Rasterizer::DispatchDirect() {
         return;
     }
 
+    if (cs.pgm_hash == 0x000000006c4465ed) {
+        LOG_ERROR(Render_Vulkan, "found cs_0x000000006c4465ed");
+    }
+
     if (!BindResources(pipeline)) {
         return;
     }

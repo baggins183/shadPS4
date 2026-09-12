@@ -244,6 +244,7 @@ const Shader::RuntimeInfo& PipelineCache::BuildRuntimeInfo(Stage stage, LogicalS
                                        cs_pgm.num_thread_z.full};
         info.cs_info.tgid_enable = {cs_pgm.IsTgidEnabled(0), cs_pgm.IsTgidEnabled(1),
                                     cs_pgm.IsTgidEnabled(2)};
+        info.cs_info.tg_size_en = cs_pgm.settings.tg_size_enable;
         info.cs_info.shared_memory_size = cs_pgm.SharedMemSize();
         break;
     }

@@ -812,6 +812,7 @@ EmitContext::BufferSpv EmitContext::DefineBuffer(bool is_written, bool is_cohere
     }
     switch (buffer_type) {
     case BufferType::GdsBuffer:
+        gds_buffer_binding = binding.unified;
         Name(id, "gds_buffer");
         break;
     case BufferType::Flatbuf:

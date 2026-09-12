@@ -182,7 +182,7 @@ struct ComputeProgram {
         u64 num_user_regs : 5;
         u64 : 1;
         u64 tgid_enable : 3;
-        u64 tgid_size_enable : 1;
+        u64 tg_size_enable : 1;
         u64 tigid_comp_count : 2;
         u64 : 2;
         u64 lds_dwords : 9;

@@ -426,6 +426,7 @@ public:
     Id buffer_atomic_float_max_function{};
 
     u32 ordered_count_utility_buffer_binding{};
+    u32 gds_buffer_binding{};
     u32 shared_mem_ordered_count_base;
 
 private:
