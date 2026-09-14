@@ -433,8 +433,8 @@ bool Rasterizer::BindResources(const Pipeline* pipeline) {
         BindBuffers(*stage, binding, push_data);
         BindTextures(*stage, binding);
         uses_dma |= stage->uses_dma;
-        if (stage->uses_dma) {
-            LOG_ERROR(Render, "Enabling DMA for shader {:#x}", stage->pgm_hash);
+        if (stage->UsesOrderedCount()) {
+            // LOG_ERROR(Render, "shader {:#x} uses ORDERED_COUNT", stage->pgm_hash);
         }
     }
 

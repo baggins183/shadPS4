@@ -13,8 +13,6 @@
 #extension GL_EXT_shader_atomic_int64 : require
 #extension GL_KHR_shader_subgroup_vote : require
 
-#define GOW 1 // hack
-
 struct WarpMem {
     uint a[MAX_NUM_WAVES];
     uint b[MAX_NUM_WAVES];
@@ -238,16 +236,10 @@ uint get_global_wave_index(uint workgroup_index) {
 uint ordered_count_add_per_wave(uint workgroup_index, uint m0, uint packer_id, uint value, bool is_active)
 {
     uint prev_count = 0;
-    uint gds_index = bitfieldExtract(m0, 18, 14);
+    uint gds_index = m0 >> 18;
 
     // TODO can there be no active threads?
-#if GOW
-    // Hack for GOW because this is placed inside exec-divergent branch
-    // currently (but only one thread active anyways in what Ive seen)
-    bool elected = is_active;
-#else
     bool elected = elect_generic(is_active);
-#endif
 
     if (elected) {
         uint wave_index = get_global_wave_index(workgroup_index);
@@ -270,14 +262,10 @@ uint ordered_count_add_per_wave(uint workgroup_index, uint m0, uint packer_id, u
 uint ordered_count_swap_per_wave(uint workgroup_index, uint m0, uint packer_id, uint value, bool is_active)
 {
     uint prev_count = 0;
-    uint gds_index = bitfieldExtract(m0, 18, 14);
+    uint gds_index = m0 >> 18;
 
     // TODO can there be no active threads?
-#if GOW
-    bool elected = is_active;
-#else
     bool elected = elect_generic(is_active);
-#endif
 
     if (elected) {
         uint wave_index = get_global_wave_index(workgroup_index);
@@ -300,7 +288,7 @@ uint ordered_count_swap_per_wave(uint workgroup_index, uint m0, uint packer_id, 
 uint ordered_count_add_workgroupsync(uint workgroup_index, uint m0, uint packer_id, uint value, bool is_active) {
     uint wave_id = get_wave_id();
     uint num_waves = get_num_waves();
-    uint gds_index = bitfieldExtract(m0, 18, 14);
+    uint gds_index = m0 >> 18;
 
     // TODO can there be no active threads?
     bool elected = elect_generic(is_active);

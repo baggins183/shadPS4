@@ -125,7 +125,7 @@ bool ExecuteShaderHLE(const Shader::Info& info, const AmdGpu::Regs& regs,
     switch (info.pgm_hash) {
     case COPY_SHADER_HASH:
         return ExecuteCopyShaderHLE(info, cs_program, rasterizer);
-#if 0
+#if 1
     case 0x000000006c4465ed:
         return true;
 #endif

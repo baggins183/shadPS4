@@ -211,6 +211,11 @@ void CollectShaderInfoPass(IR::Program& program, const Profile& profile) {
             .buffer_type = BufferType::OrderedCountUtility,
             .is_written = true,
         });
+        info.buffers.push_back({
+            .used_types = IR::Type::U32,
+            .buffer_type = BufferType::GdsBuffer, // TODO clean up
+            .is_written = true,
+        });
     }
 }
 

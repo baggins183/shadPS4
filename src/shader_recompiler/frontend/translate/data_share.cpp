@@ -342,7 +342,6 @@ void Translator::DS_ORDERED_COUNT(const GcnInst& inst) {
     ASSERT_MSG(info.l_stage == LogicalStage::Compute, "Only supported in compute");
     LOG_ERROR(Render_Recompiler, "Found DS_ORDERED_COUNT");
     const IR::U32 value{GetSrc(inst.src[0])};
-    const u32 packer_id = inst.control.ds.offset0 >> 2;
     const u32 offset = (inst.control.ds.offset1 << 8) | inst.control.ds.offset0;
     OrderedCount::Flags flags{.raw = offset};
 
