@@ -1,4 +1,4 @@
-#include "common/bit_field.h"
+#include <cstddef>
 #include "common/types.h"
 
 namespace Shader::SharedMemory {

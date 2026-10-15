@@ -188,7 +188,7 @@ public:
     [[nodiscard]] U1 WaveElect(const U1& exec);
     // Elect, but always elect invocation 0 if no active threads
     [[nodiscard]] U1 WaveElectOrLane0(const U1& exec);
-    [[nodiscard]] U32 ReadFirstLane(const U32& value, const U1& exec);
+    [[nodiscard]] U32 ReadFirstLane(const U32& value, const U1& exec, bool already_elected = false);
     [[nodiscard]] U32 ReadLane(const U32& value, const U32& lane);
     [[nodiscard]] U32 WriteLane(const U32& value, const U32& write_value, const U32& lane);
     [[nodiscard]] U64 Ballot(const U1& bit);

@@ -233,9 +233,9 @@ void LowerWave64BallotPass(IR::Program& program, const RuntimeInfo& runtime_info
         } else if (inst->GetOpcode() == IR::Opcode::ReadFirstLane) {
             const IR::U1 exec{inst->Arg(1)};
             const IR::U32 value{inst->Arg(0)};
-            // Using Elect means 4 barriers total. Could reduce by unfactoring and using more
-            // shared mem, but this seems simplest for now
-            const IR::U1 elected{ir.WaveElectOrLane0(exec)};
+            const bool already_elected(inst->Flags<bool>());
+            // When we know exec mask only has 1 bit set, don't need to do an elect
+            const IR::U1 elected{already_elected ? exec : ir.WaveElectOrLane0(exec)};
             const IR::U32 lo_subgroup_offset =
                 ir.ShiftLeftLogical(ir.BitwiseAnd(ir.Imm32(~1u), subgroup_id), ir.Imm32(2u));
             ir.PredicatedWriteSharedU32Scratch(value, lo_subgroup_offset, elected);

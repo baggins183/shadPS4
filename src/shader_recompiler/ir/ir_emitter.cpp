@@ -695,8 +695,8 @@ U1 IREmitter::WaveElectOrLane0(const U1& exec) {
     return Inst<U1>(Opcode::WaveElectOrLane0, exec);
 }
 
-U32 IREmitter::ReadFirstLane(const U32& value, const U1& exec) {
-    return Inst<U32>(Opcode::ReadFirstLane, value, exec);
+U32 IREmitter::ReadFirstLane(const U32& value, const U1& exec, bool already_elected) {
+    return Inst<U32>(Opcode::ReadFirstLane, Flags{already_elected}, value, exec);
 }
 
 U32 IREmitter::ReadLane(const U32& value, const U32& lane) {
