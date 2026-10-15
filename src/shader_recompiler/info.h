@@ -12,6 +12,7 @@
 #include "shader_recompiler/frontend/copy_shader.h"
 #include "shader_recompiler/frontend/tessellation.h"
 #include "shader_recompiler/ir/attribute.h"
+#include "shader_recompiler/ir/ir_emitter.h"
 #include "shader_recompiler/ir/passes/srt.h"
 #include "shader_recompiler/ir/reg.h"
 #include "shader_recompiler/ir/type.h"
@@ -110,8 +111,19 @@ struct Info : InfoPersistent {
     CopyShaderData gs_copy_data;
     u32 uses_patches{};
 
-    u32 shared_memory_scratch_base{};
-    u32 shared_memory_scratch_size{};
+    struct SharedMemorySection {
+        IR::Type used_types;
+        u32 size;
+        u32 alignment;
+    };
+
+    std::array<SharedMemorySection, SharedMemory::NumSections> shared_sections;
+
+    inline SharedMemorySection& GetSharedMemSection(SharedMemory::Section section) {
+        return shared_sections[static_cast<u32>(section)];
+    }
+
+    bool uses_aliased_shared_memory{};
 
     VAddr pgm_base;
     bool has_storage_images{};
@@ -128,7 +140,6 @@ struct Info : InfoPersistent {
     bool uses_group_shuffle{};
     bool uses_group_ballot{};
     bool uses_group_vote{};
-    IR::Type shared_types{};
     bool uses_fp16{};
     bool uses_fp64{};
     bool uses_pack_10_11_11{};

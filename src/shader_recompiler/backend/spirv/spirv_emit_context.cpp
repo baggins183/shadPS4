@@ -1046,38 +1046,39 @@ void EmitContext::DefineImagesAndSamplers() {
 }
 
 void EmitContext::DefineSharedMemory() {
-    const auto num_types = std::popcount(static_cast<u32>(info.shared_types));
-    if (num_types == 0) {
-        return;
-    }
     ASSERT(info.hw_stage == HwStage::Compute);
 
-    u32 shared_mem_total_size = 0;
+    Info::SharedMemorySection& guest_section =
+        info.GetSharedMemSection(SharedMemory::Section::Guest);
+    guest_section.size = runtime_info.hw.cs.shared_memory_size;
 
-    const u32 shared_mem_guest_base = 0;
-    const u32 shared_mem_guest_size = runtime_info.hw.cs.shared_memory_size;
-    shared_mem_total_size = shared_mem_guest_base + shared_mem_guest_size;
+    std::array<u32, SharedMemory::NumSections> section_offsets;
+    u32 offset = 0;
 
-    if (info.shared_memory_scratch_size > 0) {
-        shared_mem_total_size = info.shared_memory_scratch_base;
-        shared_mem_total_size += info.shared_memory_scratch_size;
+    if (info.uses_aliased_shared_memory) {
+        for (auto i = 0; i < SharedMemory::NumSections; i++) {
+            if (info.shared_sections[i].size == 0) {
+                continue;
+            }
+
+            offset = Common::AlignUp(offset, info.shared_sections[i].alignment);
+            section_offsets[i] = offset;
+            offset += info.shared_sections[i].size;
+        }
     }
 
-    const auto make_type = [&](IR::Type type, Id element_type, u32 element_size,
-                               std::string_view name) {
-        if (False(info.shared_types & type)) {
-            // Skip unused shared memory types.
-            return std::make_tuple(Id{}, Id{}, Id{});
-        }
+    ASSERT(offset <= profile.max_shared_memory_size);
 
-        const u32 num_elements{Common::DivCeil(shared_mem_total_size, element_size)};
+    const auto make_type = [&](IR::Type type, Id element_type, u32 element_size,
+                               std::string_view name, u32 offset, u32 size_bytes) -> SharedSpv {
+        const u32 num_elements{Common::DivCeil(size_bytes, element_size)};
         const Id array_type{TypeArray(element_type, ConstU32(num_elements))};
 
         const auto mem_type = [&] {
-            if (num_types > 1) {
+            if (info.uses_aliased_shared_memory) {
                 const Id struct_type{TypeStruct(array_type)};
                 Decorate(struct_type, spv::Decoration::Block);
-                MemberDecorate(struct_type, 0u, spv::Decoration::Offset, 0u);
+                MemberDecorate(struct_type, 0u, spv::Decoration::Offset, offset);
                 return struct_type;
             } else {
                 return array_type;
@@ -1090,21 +1091,49 @@ void EmitContext::DefineSharedMemory() {
         Name(variable, name);
         interfaces.push_back(variable);
 
-        if (num_types > 1) {
+        if (info.uses_aliased_shared_memory) {
             Decorate(array_type, spv::Decoration::ArrayStride, element_size);
             Decorate(variable, spv::Decoration::Aliased);
         }
 
-        return std::make_tuple(variable, element_pointer, pointer);
+        return SharedSpv{variable, element_pointer, pointer};
     };
-    std::tie(shared_memory_u16, shared_u16, shared_memory_u16_type) =
-        make_type(IR::Type::U16, U16, 2u, "shared_mem_u16");
-    std::tie(shared_memory_u32, shared_u32, shared_memory_u32_type) =
-        make_type(IR::Type::U32, U32[1], 4u, "shared_mem_u32");
-    std::tie(shared_memory_u64, shared_u64, shared_memory_u64_type) =
-        make_type(IR::Type::U64, U64, 8u, "shared_mem_u64");
 
-    ASSERT(shared_mem_total_size < profile.max_shared_memory_size);
+    static constexpr std::array<const std::string, SharedMemory::NumSections> section_names = {
+        "guest_shared_", "scratch_shared_"};
+
+    static const std::array<std::tuple<IR::Type, PointerType, Id, u32, const char*>,
+                            static_cast<size_t>(PointerType::NumAlias)>
+        type_map{{
+            {IR::Type::U8, PointerType::U8, U8, 1u, "u8"},
+            {IR::Type::U16, PointerType::U16, U16, 2u, "u16"},
+            {IR::Type::U32, PointerType::U32, U32[1], 4u, "u32"},
+            {IR::Type::F32, PointerType::F32, F32[1], 4u, "f32"},
+            {IR::Type::U64, PointerType::U64, U64, 8u, "u64"},
+            {IR::Type::F64, PointerType::F64, F64[1], 8u, "f64"},
+        }};
+
+    for (auto i = 0; i < SharedMemory::NumSections; i++) {
+        IR::Type used_types = info.shared_sections[i].used_types;
+        SharedDefinition& def = shared_memory_sections[i];
+        const u32 section_offset = section_offsets[i];
+        const u32 section_size = info.shared_sections[i].size;
+        const auto& section_name = section_names[i];
+
+        for (auto [ir_type, pointer_type, element_type, element_size, element_name] : type_map) {
+            if (!(static_cast<u64>(used_types) & static_cast<u64>(ir_type))) {
+                continue;
+            }
+
+            def.Alias(pointer_type) =
+                make_type(ir_type, element_type, element_size, section_name + element_name,
+                          section_offset, section_size);
+
+            used_types &= ~ir_type;
+        }
+
+        ASSERT(static_cast<u64>(used_types) == 0);
+    }
 }
 
 Id EmitContext::DefineFloat32ToUfloatM5(u32 mantissa_bits, const std::string_view name) {
