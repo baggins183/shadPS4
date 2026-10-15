@@ -243,8 +243,10 @@ void LowerWave64BallotPass(IR::Program& program, const RuntimeInfo& runtime_info
             const IR::U32 result{ir.LoadSharedU32Scratch(lo_subgroup_offset)};
             ir.Barrier();
             inst->ReplaceUsesWithAndRemove(result);
-            // Need to expand Elect too
-            worklist.push_back(elected.Inst());
+            if (!already_elected) {
+                // Need to expand Elect too
+                worklist.push_back(elected.Inst());
+            }
         } else if (inst->GetOpcode() == IR::Opcode::WaveId) {
             u32 subgroup_size = profile.subgroup_size;
             ASSERT(subgroup_size < 64);
