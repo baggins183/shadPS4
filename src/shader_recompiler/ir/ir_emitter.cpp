@@ -282,7 +282,9 @@ void IREmitter::SetPatch(Patch patch, const F32& value) {
 
 Value IREmitter::LoadShared(int bit_size, bool is_signed, const U32& offset, bool is_gds,
                             SharedMemory::Section section) {
-    SharedMemory::Flags flags(section, is_gds);
+    SharedMemory::Flags flags{};
+    flags.is_gds.Assign(is_gds);
+    flags.section.Assign(section);
     switch (bit_size) {
     case 16:
         return Inst<U16>(Opcode::LoadSharedU16, Flags{flags}, offset);
@@ -297,7 +299,9 @@ Value IREmitter::LoadShared(int bit_size, bool is_signed, const U32& offset, boo
 
 void IREmitter::WriteShared(int bit_size, const Value& value, const U32& offset, bool is_gds,
                             SharedMemory::Section section) {
-    SharedMemory::Flags flags(section, is_gds);
+    SharedMemory::Flags flags{};
+    flags.is_gds.Assign(is_gds);
+    flags.section.Assign(section);
     switch (bit_size) {
     case 16:
         Inst(Opcode::WriteSharedU16, Flags{flags}, offset, value);
@@ -327,7 +331,9 @@ void IREmitter::WriteSharedU32Scratch(const U32& value, const U32& offset) {
 
 void IREmitter::PredicatedWriteSharedU32Scratch(const U32& value, const U32& offset,
                                                 const U1& cond) {
-    SharedMemory::Flags flags(SharedMemory::Section::Scratch, false);
+    SharedMemory::Flags flags{};
+    flags.is_gds.Assign(false);
+    flags.section.Assign(SharedMemory::Section::Scratch);
     Inst(Opcode::PredicatedWriteSharedU32, Flags{flags}, offset, value, cond);
 }
 

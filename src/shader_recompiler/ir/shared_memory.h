@@ -1,4 +1,5 @@
 #include <cstddef>
+#include "common/bit_field.h"
 #include "common/types.h"
 
 namespace Shader::SharedMemory {
@@ -11,12 +12,10 @@ enum class Section : u32 {
 
 static constexpr auto NumSections = static_cast<size_t>(Section::NumSections);
 
-struct Flags {
-    Flags(Section _section, bool _is_gds) : section(_section), is_gds(_is_gds) {}
-    Flags() : Flags(Section::Guest, false) {}
-
-    bool is_gds;
-    Section section;
+union Flags {
+    BitField<0, 1, u64> is_gds;
+    BitField<16, 16, Section> section;
+    u64 raw;
 };
 
 } // namespace Shader::SharedMemory

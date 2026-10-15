@@ -59,6 +59,7 @@ void Visit(Info& info, const IR::Inst& inst) {
         break;
     case IR::Opcode::LoadSharedU32:
     case IR::Opcode::WriteSharedU32:
+    case IR::Opcode::PredicatedWriteSharedU32:
     case IR::Opcode::SharedAtomicIAdd32:
     case IR::Opcode::SharedAtomicISub32:
     case IR::Opcode::SharedAtomicSMin32:

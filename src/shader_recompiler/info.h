@@ -117,7 +117,7 @@ struct Info : InfoPersistent {
         u32 alignment;
     };
 
-    std::array<SharedMemorySection, SharedMemory::NumSections> shared_sections;
+    std::array<SharedMemorySection, SharedMemory::NumSections> shared_sections{};
 
     inline SharedMemorySection& GetSharedMemSection(SharedMemory::Section section) {
         return shared_sections[static_cast<u32>(section)];

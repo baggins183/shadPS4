@@ -1046,7 +1046,9 @@ void EmitContext::DefineImagesAndSamplers() {
 }
 
 void EmitContext::DefineSharedMemory() {
-    ASSERT(info.hw_stage == HwStage::Compute);
+    if (info.hw_stage != HwStage::Compute) {
+        return;
+    }
 
     Info::SharedMemorySection& guest_section =
         info.GetSharedMemSection(SharedMemory::Section::Guest);
