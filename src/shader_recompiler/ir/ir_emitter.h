@@ -95,7 +95,7 @@ public:
 
     [[nodiscard]] Value LoadShared(int bit_size, bool is_signed, const U32& offset,
                                    bool is_gds = false,
-                                   SharedMemory::Section scection = SharedMemory::Section::Guest);
+                                   SharedMemory::Section section = SharedMemory::Section::Guest);
     void WriteShared(int bit_size, const Value& value, const U32& offset, bool is_gds = false,
                      SharedMemory::Section section = SharedMemory::Section::Guest);
 

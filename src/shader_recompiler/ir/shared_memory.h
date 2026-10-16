@@ -13,6 +13,12 @@ enum class Section : u32 {
 static constexpr auto NumSections = static_cast<size_t>(Section::NumSections);
 
 union Flags {
+    Flags(bool _is_gds, Section _section) {
+        is_gds.Assign(_is_gds), section.Assign(_section);
+    }
+    Flags() : Flags(false, Section::Guest) {}
+    ~Flags() = default;
+
     BitField<0, 1, u64> is_gds;
     BitField<16, 16, Section> section;
     u64 raw;

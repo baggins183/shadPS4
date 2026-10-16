@@ -20,8 +20,8 @@ static void AddFlatbuf(Info& info) {
 static void RecordSharedMemInfo(Info& info, const IR::Inst& inst, IR::Type type, u32 size_bytes) {
     auto flags = inst.Flags<SharedMemory::Flags>();
     Info::SharedMemorySection& section_info = info.GetSharedMemSection(flags.section);
-    section_info.used_types |= type;
-    section_info.alignment = std::max(section_info.alignment, size_bytes);
+    section_info.UseType(type);
+    section_info.SetMinAlignment(size_bytes);
 }
 
 void Visit(Info& info, const IR::Inst& inst) {

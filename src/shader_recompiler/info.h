@@ -115,6 +115,17 @@ struct Info : InfoPersistent {
         IR::Type used_types;
         u32 size;
         u32 alignment;
+
+        inline void UseType(IR::Type type) {
+            used_types |= type;
+        }
+        inline void SetMinAlignment(u32 min_align) {
+            // TODO, alignment could just be inferred from used types
+            alignment = std::max(alignment, min_align);
+        }
+        inline void SetMinSize(u32 min_size) {
+            size = std::max(size, min_size);
+        }
     };
 
     std::array<SharedMemorySection, SharedMemory::NumSections> shared_sections{};

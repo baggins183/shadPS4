@@ -327,6 +327,38 @@ public:
         }
     }
 
+    struct SharedSpv {
+        Id id;
+        Id element_type;
+        Id type;
+    };
+
+    struct SharedDefinition {
+        std::array<SharedSpv, u32(PointerType::NumAlias)> aliases;
+
+        template <class Self>
+        auto& Alias(this Self& self, PointerType alias) {
+            return self.aliases[u32(alias)];
+        }
+    };
+
+    std::array<SharedDefinition, SharedMemory::NumSections> shared_memory_defs;
+
+    Id EmitSharedMemoryAccess(const Id offset, PointerType pointer_type,
+                              SharedMemory::Section section = SharedMemory::Section::Guest) {
+        const PointerSize pointer_size = GetPointerSize(pointer_type);
+        const Id shift_id{ConstU32(static_cast<u32>(pointer_size))};
+        const Id index{OpShiftRightLogical(U32[1], offset, shift_id)};
+        auto [shared_mem, result_type, _] =
+            shared_memory_defs[static_cast<u32>(section)].Alias(pointer_type);
+
+        if (info.uses_aliased_shared_memory) {
+            return OpAccessChain(result_type, shared_mem, u32_zero_value, index);
+        }
+        // Workgroup layout struct omitted.
+        return OpAccessChain(result_type, shared_mem, index);
+    }
+
     struct BufferSpv {
         Id id;
         Id pointer_type;
@@ -348,38 +380,6 @@ public:
             return self.offsets[u32(size)];
         }
     };
-
-    struct SharedSpv {
-        Id id;
-        Id element_type;
-        Id type;
-    };
-
-    struct SharedDefinition {
-        std::array<SharedSpv, u32(PointerType::NumAlias)> aliases;
-
-        template <class Self>
-        auto& Alias(this Self& self, PointerType alias) {
-            return self.aliases[u32(alias)];
-        }
-    };
-
-    std::array<SharedDefinition, SharedMemory::NumSections> shared_memory_sections;
-
-    Id EmitSharedMemoryAccess(const Id offset, PointerType pointer_type,
-                              SharedMemory::Section section = SharedMemory::Section::Guest) {
-        const PointerSize pointer_size = GetPointerSize(pointer_type);
-        const Id shift_id{ConstU32(static_cast<u32>(pointer_size))};
-        const Id index{OpShiftRightLogical(U32[1], offset, shift_id)};
-        auto [shared_mem, result_type, _] =
-            shared_memory_sections[static_cast<u32>(section)].Alias(pointer_type);
-
-        if (info.uses_aliased_shared_memory) {
-            return OpAccessChain(result_type, shared_mem, u32_zero_value, index);
-        }
-        // Workgroup layout struct omitted.
-        return OpAccessChain(result_type, shared_mem, index);
-    }
 
     Bindings& binding;
     boost::container::small_vector<Id, 16> buf_type_ids;

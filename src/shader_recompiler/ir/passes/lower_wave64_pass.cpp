@@ -158,9 +158,9 @@ void LowerWave64BallotPass(IR::Program& program, const RuntimeInfo& runtime_info
     const u32 scratch_size =
         (Common::AlignUp(num_threads, 64) / profile.subgroup_size) * sizeof(u32);
 
-    Info::SharedMemorySection& section_info =
+    Info::SharedMemorySection& scratch_info =
         program.info.GetSharedMemSection(SharedMemory::Section::Scratch);
-    section_info.size = std::max(section_info.size, scratch_size);
+    scratch_info.SetMinSize(scratch_size);
 
     while (!worklist.empty()) {
         IR::Inst* inst = worklist.front();
