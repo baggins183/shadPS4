@@ -90,6 +90,12 @@ void Translator::EmitDataShare(const GcnInst& inst) {
         return DS_READ(64, false, true, false, inst);
     case Opcode::DS_READ2ST64_B64:
         return DS_READ(64, false, true, true, inst);
+    case Opcode::DS_MIN_F32:
+        return DS_OP_F32(inst, AtomicOp::Fmin);
+    case Opcode::DS_MAX_F32:
+        return DS_OP_F32(inst, AtomicOp::Fmax);
+    case Opcode::DS_ORDERED_COUNT:
+        return DS_ORDERED_COUNT(inst);
     default:
         LogMissingOpcode(inst);
     }
@@ -99,7 +105,7 @@ void Translator::EmitDataShare(const GcnInst& inst) {
 
 void Translator::V_READFIRSTLANE_B32(const GcnInst& inst) {
     const IR::U32 value{GetSrc(inst.src[0])};
-    SetDst(inst.dst[0], ir.ReadFirstLane(value));
+    SetDst(inst.dst[0], ir.ReadFirstLane(value, ir.GetExec()));
 }
 
 void Translator::V_READLANE_B32(const GcnInst& inst) {
@@ -171,6 +177,27 @@ void Translator::DS_OP(const GcnInst& inst, AtomicOp op, bool rtn) {
             SetDst64(inst.dst[0], original_val);
         }
     }
+}
+
+void Translator::DS_OP_F32(const GcnInst& inst, AtomicOp op) {
+    const bool is_gds = inst.control.ds.gds;
+    const IR::U32 addr{GetSrc(inst.src[0])};
+    const IR::F32 data{GetSrc<IR::F32>(inst.src[1])};
+
+    const IR::U32 offset =
+        ir.Imm32((u32(inst.control.ds.offset1) << 8u) + u32(inst.control.ds.offset0));
+    const IR::U32 addr_offset = ir.IAdd(addr, offset);
+    const IR::F32 original_val = [&] {
+        switch (op) {
+        case AtomicOp::Fmin:
+            return ir.SharedAtomicFMin(addr_offset, data, is_gds);
+        case AtomicOp::Fmax:
+            return ir.SharedAtomicFMax(addr_offset, data, is_gds);
+        default:
+            UNREACHABLE();
+        }
+    }();
+    SetDst(inst.dst[0], original_val);
 }
 
 void Translator::DS_CMPST(int bit_size, bool rtn, const GcnInst& inst) {
@@ -348,6 +375,29 @@ void Translator::DS_CONSUME(const GcnInst& inst) {
     const IR::U32 gds_offset = ir.IAdd(base, ir.Imm32(inst_offset));
     const IR::U32 prev = ir.DataConsume(ir.ShiftRightLogical(gds_offset, ir.Imm32(2u)));
     SetDst(inst.dst[0], prev);
+}
+
+void Translator::DS_ORDERED_COUNT(const GcnInst& inst) {
+    ASSERT_MSG(info.sw_stage == SwStage::Compute, "Only supported in compute");
+    LOG_ERROR(Render_Recompiler, "Found DS_ORDERED_COUNT");
+    const IR::U32 value{GetSrc(inst.src[0])};
+    const u32 offset = (inst.control.ds.offset1 << 8) | inst.control.ds.offset0;
+    OrderedCount::Flags flags{.raw = offset};
+
+    ASSERT_MSG(flags.wave_release.Value(), "DS_ORDERED_COUNT has release==0");
+
+    const IR::U1 exec = ir.GetExec();
+    // we need to execute the op when no lanes are active to advance counter
+    // without performing atomic
+    const IR::U1 elected = ir.ElectOrLane0(exec);
+    const IR::U32 m0{ir.GetM0()};
+    const IR::U32 append_term{ir.BitFieldExtract(m0, ir.Imm32(0u), ir.Imm32(16u))};
+    const IR::U32 m0_hi{ir.BitFieldExtract(m0, ir.Imm32(16u), ir.Imm32(16u))};
+    const IR::U32 gds_offset{ir.IAdd(m0_hi, ir.Imm32(u32(inst.control.ds.offset0)))};
+    const IR::U32 ordered_count_result =
+        ir.OrderedCount(value, gds_offset, append_term, elected, exec, flags);
+    const IR::U32 broadcast = ir.ReadFirstLane(ordered_count_result, exec);
+    SetDst(inst.dst[0], broadcast);
 }
 
 } // namespace Shader::Gcn

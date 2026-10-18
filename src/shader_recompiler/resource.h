@@ -66,6 +66,7 @@ enum class SharpFetchPostOp : u8 {
     OffsetByProgramBase,
     // For images,
     ConvertCubeTo2DArray,
+    ForceNfmtToUnorm,
     // For samplers
     DisableAnisoIfSingleLod,
     ForceRepeatXyzClamp,
@@ -81,6 +82,7 @@ enum class BufferType : u8 {
     GdsBuffer,
     SharedMemory,
     ClipPlanes,
+    OrderedCountUtility,
 };
 
 struct BufferResource {
@@ -139,6 +141,9 @@ struct ImageResource {
         if (post_op == SharpFetchPostOp::ConvertCubeTo2DArray) {
             image.type = u64(AmdGpu::ImageType::Color2DArray);
             image.depth = (image.depth + 1) * 6 - 1;
+        } else if (post_op == SharpFetchPostOp::ForceNfmtToUnorm) {
+            image.num_format = static_cast<u64>(AmdGpu::NumberFormat::Unorm);
+            LOG_ERROR(Render_Recompiler, "patching num_format to Unorm");
         }
         if (!image.Valid()) {
             image = AmdGpu::Image::Null(is_depth);

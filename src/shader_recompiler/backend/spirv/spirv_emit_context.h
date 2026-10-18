@@ -48,6 +48,9 @@ public:
     void DefineAmdPerVertexAttribs();
     void DefineWorkgroupIndex();
 
+    void InitEmulatedWorkgroupIndex();
+    void InitEmulatedWorkgroupId();
+
     [[nodiscard]] Id DefineInput(Id type, std::optional<u32> location = std::nullopt,
                                  std::optional<spv::BuiltIn> builtin = std::nullopt) {
         const Id input_id{DefineVariable(type, builtin, spv::StorageClass::Input)};
@@ -232,6 +235,7 @@ public:
     Id shared_u16{};
     Id shared_u32{};
     Id shared_u64{};
+    Id shared_f32{};
 
     Id input_u32{};
     Id input_f32{};
@@ -277,6 +281,7 @@ public:
     Id local_invocation_id{};
     Id local_invocation_index{};
     Id invocation_id{};
+    Id subgroup_id{};
     Id subgroup_local_invocation_id{};
     Id subgroup_lt_mask{};
     Id image_u32{};
@@ -285,10 +290,12 @@ public:
     Id shared_memory_u16{};
     Id shared_memory_u32{};
     Id shared_memory_u64{};
+    Id shared_memory_f32{};
 
     Id shared_memory_u16_type{};
     Id shared_memory_u32_type{};
     Id shared_memory_u64_type{};
+    Id shared_memory_f32_type{};
 
     Id bary_coord{};
     Id bary_coord_smooth{};
@@ -326,6 +333,23 @@ public:
         B64,
         NumClass,
     };
+
+    static inline PointerSize GetPointerSize(PointerType pointer_type) {
+        switch (pointer_type) {
+        case PointerType::U8:
+            return PointerSize::B8;
+        case PointerType::U16:
+            return PointerSize::B16;
+        case PointerType::U32:
+        case PointerType::F32:
+            return PointerSize::B32;
+        case PointerType::U64:
+        case PointerType::F64:
+            return PointerSize::B64;
+        default:
+            UNREACHABLE();
+        }
+    }
 
     struct BufferSpv {
         Id id;
@@ -392,12 +416,28 @@ public:
     Id read_const{};
     Id read_const_dynamic{};
 
+    // Ordered count stuff
+    Id emulated_workgroup_id_id{};
+    Id current_counter_var{};
+    // used only when the shader contains any ds_ordered_count with release==0
+    Id holding_ordered_counter_flag{};
+
+    // generate permutations based on instruction flags: [add, swap] x release -> function id
+    std::map<std::pair<OrderedCount::Op, bool>, Id> ordered_count_functions;
+
+    Id buffer_atomic_float_min_function{};
+    Id buffer_atomic_float_max_function{};
+
+    u32 ordered_count_utility_buffer_binding{};
+    u32 gds_buffer_binding{};
+
 private:
     void DefineArithmeticTypes();
     void DefineInterfaces();
     void DefineInputs();
     void DefineVertexBlock();
     void DefineOutputs();
+    void DefinePrivateVars();
     void DefinePushDataBlock();
     void DefineBuffers();
     void DefineImagesAndSamplers();
@@ -418,6 +458,8 @@ private:
     Id DefineReadConst(bool dynamic);
 
     Id GetBufferSize(u32 sharp_idx);
+
+    void DefineOrderedCountFunction(OrderedCount::Op op, bool acquire_only);
 };
 
 } // namespace Shader::Backend::SPIRV

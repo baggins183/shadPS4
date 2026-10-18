@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <set>
 #include <span>
 #include <vector>
 #include <boost/container/static_vector.hpp>
@@ -15,6 +16,7 @@
 #include "shader_recompiler/ir/passes/srt.h"
 #include "shader_recompiler/ir/reg.h"
 #include "shader_recompiler/ir/type.h"
+#include "shader_recompiler/ordered_count.h"
 #include "shader_recompiler/params.h"
 #include "shader_recompiler/resource.h"
 #include "shader_recompiler/runtime_info.h"
@@ -45,7 +47,6 @@ struct InfoPersistent {
     FMaskResourceList fmasks;
 
     u32 fetch_shader_sgpr_base{};
-    u32 shared_memory_scratch_size{};
 
     u64 pgm_hash{};
 
@@ -111,6 +112,9 @@ struct Info : InfoPersistent {
     CopyShaderData gs_copy_data;
     u32 uses_patches{};
 
+    u32 shared_memory_scratch_base{};
+    u32 shared_memory_scratch_size{};
+
     VAddr pgm_base;
     bool has_storage_images{};
     bool has_discard{};
@@ -119,11 +123,13 @@ struct Info : InfoPersistent {
     bool has_flatbuf{};
     bool uses_buffer_atomic_float_min_max{};
     bool uses_image_atomic_float_min_max{};
+    bool uses_subgroup_id{};
     bool uses_lane_id{};
     bool uses_shader_clock{};
     bool uses_group_quad{};
     bool uses_group_shuffle{};
     bool uses_group_ballot{};
+    bool uses_group_vote{};
     IR::Type shared_types{};
     bool uses_fp16{};
     bool uses_fp64{};
@@ -131,8 +137,12 @@ struct Info : InfoPersistent {
     bool uses_unpack_10_11_11{};
     bool uses_buffer_int64_atomics{};
     bool uses_shared_int64_atomics{};
+    bool uses_shared_atomic_float_min_max{};
     bool stores_tess_level_outer{};
     bool stores_tess_level_inner{};
+    bool uses_ordered_count{};
+    std::set<std::pair<OrderedCount::Op, bool>> ordered_count_permutations;
+    bool uses_ordered_count_acquire_only{};
     bool translation_failed{};
 
     std::array<Interpolation, IR::NumParams> fs_interpolation{};

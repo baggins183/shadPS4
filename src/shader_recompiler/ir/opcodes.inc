@@ -32,6 +32,7 @@ OPCODE(LoadSharedU32,                                       U32,            U32,
 OPCODE(LoadSharedU64,                                       U64,            U32,                                                                            )
 OPCODE(WriteSharedU16,                                      Void,           U32,            U16,                                                            )
 OPCODE(WriteSharedU32,                                      Void,           U32,            U32,                                                            )
+OPCODE(PredicatedWriteSharedU32,                            Void,           U32,            U32,             U1,                                            )
 OPCODE(WriteSharedU64,                                      Void,           U32,            U64,                                                            )
 
 // Shared atomic operations
@@ -59,6 +60,8 @@ OPCODE(SharedAtomicXor32,                                   U32,            U32,
 OPCODE(SharedAtomicXor64,                                   U64,            U32,            U64,                                                            )
 OPCODE(SharedAtomicCmpSwap32,                               U32,            U32,            U32,            U32,                                            )
 OPCODE(SharedAtomicCmpSwap64,                               U64,            U32,            U64,            U64,                                            )
+OPCODE(SharedAtomicFmin32,                                  F32,            U32,            F32,                                                            )
+OPCODE(SharedAtomicFmax32,                                  F32,            U32,            F32,                                                            )
 
 // Context getters/setters
 OPCODE(GetUserData,                                         U32,            ScalarReg,                                                                      )
@@ -457,11 +460,14 @@ OPCODE(CubeFaceMajorAxis,                                   F32,            F32,
 
 // Warp operations
 OPCODE(LaneId,                                              U32,                                                                                            )
-OPCODE(WarpId,                                              U32,                                                                                            )
+OPCODE(WaveId,                                              U32,                                                                                            )
+OPCODE(SubgroupId,                                          U32,                                                                                            )
 OPCODE(QuadBroadcast,                                       U32,            U32,            U32                                                             )
 OPCODE(Shuffle,                                             U32,            U32,            U32                                                             )
 OPCODE(ShuffleXor,                                          U32,            U32,            U32,                                                            )
-OPCODE(ReadFirstLane,                                       U32,            U32,                                                                            )
+OPCODE(Elect,                                               U1,             U1,                                                                             )
+OPCODE(ElectOrLane0,                                        U1,             U1,                                                                             )
+OPCODE(ReadFirstLane,                                       U32,            U32,            U1                                                              )
 OPCODE(ReadLane,                                            U32,            U32,            U32                                                             )
 OPCODE(WriteLane,                                           U32,            U32,            U32,            U32                                             )
 OPCODE(Ballot,                                              U64,            U1,                                                                             )
@@ -469,6 +475,7 @@ OPCODE(BallotFindLsb,                                       U32,            U64,
 OPCODE(InverseBallot,                                       U1,             U64,                                                                            )
 OPCODE(DataAppend,                                          U32,            U32,            U1                                                              )
 OPCODE(DataConsume,                                         U32,            U32,            U1                                                              )
+OPCODE(OrderedCount,                                        U32,            U32,            U32,            U32,            U1,              U1             )
 OPCODE(GroupAny,                                            U1,             U1,                                                                             )
 
 // Time operations

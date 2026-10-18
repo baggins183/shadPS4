@@ -305,6 +305,10 @@ void IREmitter::WriteShared(int bit_size, const Value& value, const U32& offset,
     }
 }
 
+void IREmitter::PredicatedWriteSharedU32(const Value& value, const U32& offset, const U1& cond) {
+    Inst(Opcode::PredicatedWriteSharedU32, offset, value, cond);
+}
+
 U32U64 IREmitter::SharedAtomicIAdd(const U32& address, const U32U64& data, bool is_gds) {
     switch (data.Type()) {
     case Type::U32:
@@ -342,6 +346,14 @@ U32U64 IREmitter::SharedAtomicIMax(const U32& address, const U32U64& data, bool 
     default:
         ThrowInvalidType(data.Type());
     }
+}
+
+F32 IREmitter::SharedAtomicFMin(const U32& address, const F32& data, bool is_gds) {
+    return Inst<F32>(Opcode::SharedAtomicFmin32, Flags{is_gds}, address, data);
+}
+
+F32 IREmitter::SharedAtomicFMax(const U32& address, const F32& data, bool is_gds) {
+    return Inst<F32>(Opcode::SharedAtomicFmax32, Flags{is_gds}, address, data);
 }
 
 U32U64 IREmitter::SharedAtomicAnd(const U32& address, const U32U64& data, bool is_gds) {
@@ -637,12 +649,22 @@ U32 IREmitter::DataConsume(const U32& gds_dw_offset) {
     return Inst<U32>(Opcode::DataConsume, gds_dw_offset, GetExec());
 }
 
+U32 IREmitter::OrderedCount(const U32& value, const U32& gds_offset, const U32& append_term,
+                            const U1& elected, const U1& is_active, OrderedCount::Flags flags) {
+    return Inst<U32>(Opcode::OrderedCount, Flags{flags}, value, gds_offset, append_term, elected,
+                     is_active);
+}
+
 U32 IREmitter::LaneId() {
     return Inst<U32>(Opcode::LaneId);
 }
 
-U32 IREmitter::WarpId() {
-    return Inst<U32>(Opcode::WarpId);
+U32 IREmitter::WaveId() {
+    return Inst<U32>(Opcode::WaveId);
+}
+
+U32 IREmitter::SubgroupId() {
+    return Inst<U32>(Opcode::SubgroupId);
 }
 
 U32 IREmitter::QuadBroadcast(const U32& value, const U32& index) {
@@ -657,8 +679,16 @@ U32 IREmitter::ShuffleXor(const U32& value, const U32& mask) {
     return Inst<U32>(Opcode::ShuffleXor, value, mask);
 }
 
-U32 IREmitter::ReadFirstLane(const U32& value) {
-    return Inst<U32>(Opcode::ReadFirstLane, value);
+U1 IREmitter::Elect(const U1& exec) {
+    return Inst<U1>(Opcode::Elect, exec);
+}
+
+U1 IREmitter::ElectOrLane0(const U1& exec) {
+    return Inst<U1>(Opcode::ElectOrLane0, exec);
+}
+
+U32 IREmitter::ReadFirstLane(const U32& value, const U1& exec) {
+    return Inst<U32>(Opcode::ReadFirstLane, value, exec);
 }
 
 U32 IREmitter::ReadLane(const U32& value, const U32& lane) {

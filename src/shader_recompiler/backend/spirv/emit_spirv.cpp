@@ -307,6 +307,9 @@ void SetupCapabilities(const Info& info, const Profile& profile, const RuntimeIn
     if (info.uses_group_ballot || info.loads.Get(IR::Attribute::SubgroupLtMask)) {
         ctx.AddCapability(spv::Capability::GroupNonUniformBallot);
     }
+    if (info.uses_group_vote) {
+        ctx.AddCapability(spv::Capability::GroupNonUniformVote);
+    }
     if (info.uses_shader_clock) {
         if (ctx.profile.supports_shader_subgroup_clock) {
             ctx.AddExtension("SPV_KHR_shader_clock");
@@ -372,6 +375,19 @@ void SetupCapabilities(const Info& info, const Profile& profile, const RuntimeIn
         ctx.AddExtension("SPV_KHR_workgroup_memory_explicit_layout");
         ctx.AddCapability(spv::Capability::WorkgroupMemoryExplicitLayoutKHR);
         ctx.AddCapability(spv::Capability::WorkgroupMemoryExplicitLayout16BitAccessKHR);
+        if (shared_type_count > 1) {
+            // TODO check specific types
+            ctx.AddCapability(spv::Capability::WorkgroupMemoryExplicitLayout16BitAccessKHR);
+        }
+    }
+    if (info.uses_shared_atomic_float_min_max) {
+        if (profile.supports_shared_f32_atomic_minmax) {
+            ctx.AddExtension("SPV_EXT_shader_atomic_float_min_max");
+            ctx.AddCapability(spv::Capability::AtomicFloat32MinMaxEXT);
+        } else {
+            LOG_WARNING(Render_Recompiler, "Shader uses f32 atomic min/max that your"
+                                           "Vulkan instance does not natively support");
+        }
     }
     if (info.uses_buffer_int64_atomics || info.uses_shared_int64_atomics) {
         if (info.uses_buffer_int64_atomics) {

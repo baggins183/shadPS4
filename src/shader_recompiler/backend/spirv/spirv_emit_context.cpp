@@ -177,10 +177,26 @@ void EmitContext::DefineArithmeticTypes() {
     }
 }
 
+// could rename
+void EmitContext::DefinePrivateVars() {
+    if (info.uses_ordered_count) {
+        current_counter_var = DefineVar(U32[1], spv::StorageClass::Private, u32_zero_value);
+        interfaces.push_back(current_counter_var);
+
+        if (info.uses_ordered_count_acquire_only) {
+            holding_ordered_counter_flag =
+                DefineVar(U1[1], spv::StorageClass::Private, false_value);
+            Name(holding_ordered_counter_flag, "holding_ordered_counter");
+            interfaces.push_back(holding_ordered_counter_flag);
+        }
+    }
+}
+
 void EmitContext::DefineInterfaces() {
     DefinePushDataBlock();
     DefineInputs();
     DefineOutputs();
+    DefinePrivateVars();
 }
 
 const VectorIds& GetAttributeType(EmitContext& ctx, AmdGpu::NumberFormat fmt) {
@@ -295,6 +311,7 @@ void EmitContext::DefineAmdPerVertexAttribs() {
 }
 
 void EmitContext::DefineWorkgroupIndex() {
+    ASSERT(!info.uses_ordered_count);
     const Id workgroup_id_val{OpLoad(U32[3], workgroup_id)};
     const Id workgroup_x{OpCompositeExtract(U32[1], workgroup_id_val, 0)};
     const Id workgroup_y{OpCompositeExtract(U32[1], workgroup_id_val, 1)};
@@ -315,6 +332,9 @@ void EmitContext::DefineInputs() {
         if (sw_stage != SwStage::Vertex) {
             Decorate(subgroup_local_invocation_id, spv::Decoration::Flat);
         }
+    }
+    if (info.uses_subgroup_id) {
+        subgroup_id = DefineVariable(U32[1], spv::BuiltIn::SubgroupId, spv::StorageClass::Input);
     }
     if (info.loads.GetAny(IR::Attribute::SubgroupLtMask)) {
         subgroup_lt_mask =
@@ -490,12 +510,13 @@ void EmitContext::DefineInputs() {
         break;
     }
     case SwStage::Compute:
-        if (info.loads.GetAny(IR::Attribute::WorkgroupIndex) ||
-            info.loads.GetAny(IR::Attribute::WorkgroupId)) {
+        if ((info.loads.GetAny(IR::Attribute::WorkgroupIndex) ||
+             info.loads.GetAny(IR::Attribute::WorkgroupId)) &&
+            !info.uses_ordered_count) {
             workgroup_id =
                 DefineVariable(U32[3], spv::BuiltIn::WorkgroupId, spv::StorageClass::Input);
         }
-        if (info.loads.GetAny(IR::Attribute::WorkgroupIndex)) {
+        if (info.loads.GetAny(IR::Attribute::WorkgroupIndex) || info.uses_ordered_count) {
             num_workgroups_id =
                 DefineVariable(U32[3], spv::BuiltIn::NumWorkgroups, spv::StorageClass::Input);
         }
@@ -503,7 +524,7 @@ void EmitContext::DefineInputs() {
             local_invocation_id =
                 DefineVariable(U32[3], spv::BuiltIn::LocalInvocationId, spv::StorageClass::Input);
         }
-        if (info.loads.Get(IR::Attribute::LocalInvocationIndex)) {
+        if (info.loads.Get(IR::Attribute::LocalInvocationIndex) || info.uses_ordered_count) {
             local_invocation_index = DefineVariable(U32[1], spv::BuiltIn::LocalInvocationIndex,
                                                     spv::StorageClass::Input);
         }
@@ -820,6 +841,7 @@ EmitContext::BufferSpv EmitContext::DefineBuffer(bool is_written, bool is_cohere
     switch (buffer_type) {
     case BufferType::GdsBuffer:
         Name(id, "gds_buffer");
+        gds_buffer_binding = binding.unified;
         break;
     case BufferType::Flatbuf:
         Name(id, "srt_flatbuf");
@@ -835,6 +857,10 @@ EmitContext::BufferSpv EmitContext::DefineBuffer(bool is_written, bool is_cohere
         break;
     case BufferType::SharedMemory:
         Name(id, "ssbo_shmem");
+        break;
+    case BufferType::OrderedCountUtility:
+        ordered_count_utility_buffer_binding = binding.unified;
+        Name(id, "ordered_count_utility");
         break;
     default:
         Name(id, fmt::format("ssbo_{}", binding.buffer));
@@ -1048,8 +1074,17 @@ void EmitContext::DefineSharedMemory() {
         return;
     }
     ASSERT(info.hw_stage == HwStage::Compute);
-    const u32 shared_memory_size =
-        runtime_info.hw.cs.shared_memory_size + info.shared_memory_scratch_size;
+
+    u32 shared_mem_total_size = 0;
+
+    const u32 shared_mem_guest_base = 0;
+    const u32 shared_mem_guest_size = runtime_info.hw.cs.shared_memory_size;
+    shared_mem_total_size = shared_mem_guest_base + shared_mem_guest_size;
+
+    if (info.shared_memory_scratch_size > 0) {
+        shared_mem_total_size = info.shared_memory_scratch_base;
+        shared_mem_total_size += info.shared_memory_scratch_size;
+    }
 
     const auto make_type = [&](IR::Type type, Id element_type, u32 element_size,
                                std::string_view name) {
@@ -1058,14 +1093,14 @@ void EmitContext::DefineSharedMemory() {
             return std::make_tuple(Id{}, Id{}, Id{});
         }
 
-        const u32 num_elements{Common::DivCeil(shared_memory_size, element_size)};
+        const u32 num_elements{Common::DivCeil(shared_mem_total_size, element_size)};
         const Id array_type{TypeArray(element_type, ConstU32(num_elements))};
 
         const auto mem_type = [&] {
             if (num_types > 1) {
                 const Id struct_type{TypeStruct(array_type)};
                 Decorate(struct_type, spv::Decoration::Block);
-                MemberDecorate(struct_type, 0u, spv::Decoration::Offset, 0u);
+                MemberDecorate(struct_type, 0u, spv::Decoration::Offset, 0);
                 return struct_type;
             } else {
                 return array_type;
@@ -1091,6 +1126,12 @@ void EmitContext::DefineSharedMemory() {
         make_type(IR::Type::U32, U32[1], 4u, "shared_mem_u32");
     std::tie(shared_memory_u64, shared_u64, shared_memory_u64_type) =
         make_type(IR::Type::U64, U64, 8u, "shared_mem_u64");
+    std::tie(shared_memory_f32, shared_f32, shared_memory_f32_type) =
+        make_type(IR::Type::F32, F32[1], 8u, "shared_mem_f32");
+
+    ASSERT(shared_mem_total_size < profile.max_shared_memory_size);
+
+    // TODO probably need to make work without explicit workgroup layout ext
 }
 
 Id EmitContext::DefineFloat32ToUfloatM5(u32 mantissa_bits, const std::string_view name) {
@@ -1294,6 +1335,11 @@ void EmitContext::DefineFunctions() {
     if (True(info.readconst_types & Info::ReadConstType::Dynamic)) {
         LOG_DEBUG(Render_Recompiler, "Shader {:#x} uses dynamic ReadConst", info.pgm_hash);
         read_const_dynamic = DefineReadConst(true);
+    }
+    if (info.uses_ordered_count) {
+        for (auto [op, release] : info.ordered_count_permutations) {
+            DefineOrderedCountFunction(op, release);
+        }
     }
 }
 
